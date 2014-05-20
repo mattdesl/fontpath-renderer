@@ -20,7 +20,7 @@ function TriangleRenderer(font, fontSize) {
 
 	this.simplifyAmount = 0.05;
 	this.context = null;
-	this.triangles = null;
+	this.triangles = [];
 
 	this.shapeCache = new Array(MAX_CODE_POINT);
 
@@ -136,9 +136,6 @@ TriangleRenderer.prototype.renderUnderline = function(x, y, width, height) {
 TriangleRenderer.prototype.fill = function(context, x, y, start, end) {
 	if (!context)
 		throw "fill() must be specified with a canvas context";
-	if (this.triangles === null)
-		this.process();
-
 	this.context = context;
 	this.strokeUnderline = false;
 	context.beginPath();
@@ -149,9 +146,6 @@ TriangleRenderer.prototype.fill = function(context, x, y, start, end) {
 TriangleRenderer.prototype.stroke = function(context, x, y, start, end) {
 	if (!context)
 		throw "stroke() must be specified with a canvas context";
-	if (this.triangles === null)
-		this.process();
-
 	this.context = context;
 	this.strokeUnderline = true;
 	context.beginPath();
@@ -163,14 +157,6 @@ TriangleRenderer.prototype.release = function() {
 	this.triangles.length = 0;
 	this.triangles = null;
 	this.shapeCache = {};
-};
-
-//Processes the current state into triangles. 
-TriangleRenderer.prototype.process = function() {
-	if (this.triangles === null)
-		this.triangles = [];
-
-	this.triangles.length = 0;
 };
 
 module.exports = TriangleRenderer;
