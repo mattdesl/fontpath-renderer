@@ -45,6 +45,6 @@ textRenderer.align = CanvasRenderer.Align.LEFT;
 
 In the [demo](demo) folder is a simple implementation rendering triangles with some mouse interaction.
 
-[![Result](http://i.imgur.com/7aJQwWz.png)](http://mattdesl.github.io/fontpath-renderer/demo/tris.html)
+[![Result](http://i.imgur.com/jC4hqB2.png)](http://mattdesl.github.io/fontpath-renderer/demo/tris.html)
 
 You can [run the demo here](http://mattdesl.github.io/fontpath-renderer/demo/tris.html).
