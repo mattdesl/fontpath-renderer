@@ -322,7 +322,7 @@ TextRenderer.prototype.render = function (x, y, start, end) {
                     underlineWidth = tx - underlineStartX;
                 }
 
-                this.renderGlyph(chr, glyph, scale, tx, ty);
+                this.renderGlyph(i, glyph, scale, tx, ty);
             }
 
             //Advance the iterator to the next glyph in the string

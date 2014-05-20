@@ -24,20 +24,19 @@ This is essentially an 'abstract' base class. It's up to the renderer to impleme
 
 ## usage
 
-By default, the text renderer draws all the glyphs in a single line (like fillText). You will need to call `layout()` to word-wrap the current text. Whever the text property is changed, the layout is reset to a single line. 
+Generally you set up a renderer by defining its properties, text, fonts, etc. and then optionally applying word-wrapping with the `layout()` function. Whenever you change the `text`, `font`, or `fontSize` properties, the layout is cleared (via `clearLayout()`) and the renderer is reset to a single non-wrapping string. If you are dynamically changing text, fonts, or font sizes, you will need to re-layout the text renderer to keep word-wrapping in tact.
 
 Typical usage looks something like this:
 
 ```js
-var TextRenderer = require('fontpath-renderer');
+var textRenderer = new MyTextRenderer();
 
-var textRenderer = new TextRenderer();
-
-//set the current font and pixel size
+//setup the font and text before layout()
 textRenderer.font = TestFont;
 textRenderer.fontSize = fontSize;
-
 textRenderer.text = text;
+
+//optionally layout your text with word wrapping
 textRenderer.layout(wrapWidth);
 
 //optionally set up align, wrap modes, etc...

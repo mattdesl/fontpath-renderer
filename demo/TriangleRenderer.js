@@ -1,10 +1,13 @@
 var TextRenderer = require('../index.js'); //require the fontpath-renderer base
 
+
+var smoothstep = require('interpolation').smoothstep;
 var decompose = require('fontpath-shape2d');
 var triangulate = require('shape2d-triangulate');
 
 var Vector2 = require('vecmath').Vector2;
 var tmpvec = new Vector2();
+var tmpvec2 = new Vector2();
 var center = new Vector2();
 var glyphCenter = new Vector2();
 
@@ -24,7 +27,7 @@ function TriangleRenderer(font, fontSize) {
 	//The origin to scale all triangles by
 	this.animationOrigin = new Vector2();
 	this.explode = 0;
-
+	this.animationDistance = 100;
 
 	//some random unit vectors
 	this.randomVectors = new Array(1000);
@@ -43,7 +46,8 @@ TriangleRenderer.constructor = TriangleRenderer;
 //copy statics
 TriangleRenderer.Align = TextRenderer.Align;
 
-TriangleRenderer.prototype.renderGlyph = function(chr, glyph, scale, x, y) {
+TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
+	var chr = this.text.charAt(i);
 	var codepoint = chr.charCodeAt(0);
 	var cached = this.shapeCache[ codepoint ];
 	if (!cached) {
@@ -75,8 +79,12 @@ TriangleRenderer.prototype.renderGlyph = function(chr, glyph, scale, x, y) {
 	var context = this.context;
 
 	glyphCenter.set(glyph.width/2, glyph.height/2);
+	
+	var maxDistSq = this.animationDistance*this.animationDistance;
 
 	for (var i=0; i<cached.length; i+=3) {
+		var rnd = this.randomVectors[ i % this.randomVectors.length ];
+		
 		var a = cached[i+0];
 		var b = cached[i+1];
 		var c = cached[i+2];
@@ -86,22 +94,27 @@ TriangleRenderer.prototype.renderGlyph = function(chr, glyph, scale, x, y) {
 
 		tmpvec.x = center.x * scale + x;
 		tmpvec.y = center.y * -scale + y;
+		
+		//add some randomization into the distance check
+		tmpvec.x += rnd.x*10;
+		tmpvec.y += rnd.y*10;
 
-		var maxDist = 300;
-		var anim = 1-Math.max(0, Math.min(1, tmpvec.dist(this.animationOrigin)/maxDist));
-		// anim = 1;
+		var dist = tmpvec.distSq(this.animationOrigin)/maxDistSq;
+		var anim = 1-Math.max(0, Math.min(1, dist));
 
 		// get unit vector from triangle center to glyph center
 		tmpvec.copy(center).sub(glyphCenter).normalize();
 
 		// add some randomization to the explosion
-		var rnd = this.randomVectors[ i % this.randomVectors.length ];
 		tmpvec.add(rnd);
 
+		// explode the unit vector outward
 		tmpvec.scale(500 * this.explode);
 
+		// add the unit vector to move center
 		center.add(tmpvec);
 
+		//animate our vertices...
 		tmpvec.copy(a).lerp(center, anim);
 		context.moveTo(tmpvec.x * scale + x, tmpvec.y * -scale + y);
 

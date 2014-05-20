@@ -38,7 +38,8 @@
     "shape2d-triangulate": "0.0.2",
     "vecmath": "^0.1.1",
     "fontpath-test-fonts": "0.0.4",
-    "canvas-testbed": "0.0.3"
+    "canvas-testbed": "0.0.3",
+    "interpolation": "0.0.0"
   },
   "dependencies": {
     "fontpath-wordwrap": "0.0.0",
