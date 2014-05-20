@@ -1,0 +1,45 @@
+{
+  "name": "fontpath-renderer",
+  "version": "0.0.0",
+  "description": "a generic text renderer for canvas/webgl/etc",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "browserify demo/tris.js -o demo/bundle/tris.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mattdesl/fontpath-renderer"
+  },
+  "keywords": [
+    "fontpath",
+    "font",
+    "ttf",
+    "otf",
+    "glyph",
+    "render",
+    "fillText",
+    "canvas",
+    "webgl",
+    "gl",
+    "freetype"
+  ],
+  "author": "Matt DesLauriers",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/mattdesl/fontpath-renderer/issues"
+  },
+  "homepage": "https://github.com/mattdesl/fontpath-renderer",
+  "devDependencies": {
+    "canvas-testbed": "0.0.3"
+  },
+  "optionalDependencies": {
+    "fontpath-shape2d": "0.0.2",
+    "shape2d-triangulate": "0.0.2",
+    "vecmath": "^0.1.1"
+  },
+  "dependencies": {
+    "fontpath-wordwrap": "0.0.0",
+    "fontpath-glyph-iterator": "0.0.0"
+  }
+}
