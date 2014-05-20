@@ -37,9 +37,10 @@ textRenderer.fontSize = fontSize;
 textRenderer.text = text;
 
 //optionally layout your text with word wrapping
+textRenderer.wordwrap.mode = 'pre'; // same as <pre>
 textRenderer.layout(wrapWidth);
 
-//optionally set up align, wrap modes, etc...
+//optionally set up align, underline settings, etc...
 textRenderer.align = CanvasRenderer.Align.LEFT;
 ```
 

@@ -217,6 +217,26 @@ TextRenderer.prototype.computeUnderlinePosition = function () {
         return (font.units_per_EM/4)*scale;
 };
 
+/**
+ * Gets the descent of the current font (assumes its size 
+ * is already set). This is an absolute (positive) value.
+ * 
+ * @return {[type]} [description]
+ */
+TextRenderer.prototype.getDescender = function () {
+    return Math.abs(this.iterator.fontScale * this.iterator.font.descender);
+};
+
+/**
+ * Gets the descent of the current font (assumes its size 
+ * is already set). This is an absolute (positive) value.
+ * 
+ * @return {[type]} [description]
+ */
+TextRenderer.prototype.getAscender = function () {
+    return Math.abs(this.iterator.fontScale * this.iterator.font.ascender);
+};
+
 //Signals for subclasses to optionally implmeent
 //This may be useful to stop/start paths with different fills
 TextRenderer.prototype.onBegin = function() { }
