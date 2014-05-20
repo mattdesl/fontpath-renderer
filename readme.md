@@ -36,8 +36,11 @@ var textRenderer = new TextRenderer();
 //set the current font and pixel size
 textRenderer.font = TestFont;
 textRenderer.fontSize = fontSize;
+
 textRenderer.text = text;
 textRenderer.layout(wrapWidth);
+
+//optionally set up align, wrap modes, etc...
 textRenderer.align = CanvasRenderer.Align.LEFT;
 ```
 
