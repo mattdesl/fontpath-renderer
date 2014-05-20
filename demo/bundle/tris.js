@@ -1,11 +1,14 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var TextRenderer = require('../index.js'); //require the fontpath-renderer base
 
+
+var smoothstep = require('interpolation').smoothstep;
 var decompose = require('fontpath-shape2d');
 var triangulate = require('shape2d-triangulate');
 
 var Vector2 = require('vecmath').Vector2;
 var tmpvec = new Vector2();
+var tmpvec2 = new Vector2();
 var center = new Vector2();
 var glyphCenter = new Vector2();
 
@@ -18,14 +21,14 @@ function TriangleRenderer(font, fontSize) {
 
 	this.simplifyAmount = 0.05;
 	this.context = null;
-	this.triangles = null;
+	this.triangles = [];
 
 	this.shapeCache = new Array(MAX_CODE_POINT);
 
 	//The origin to scale all triangles by
 	this.animationOrigin = new Vector2();
 	this.explode = 0;
-
+	this.animationDistance = 100;
 
 	//some random unit vectors
 	this.randomVectors = new Array(1000);
@@ -44,7 +47,8 @@ TriangleRenderer.constructor = TriangleRenderer;
 //copy statics
 TriangleRenderer.Align = TextRenderer.Align;
 
-TriangleRenderer.prototype.renderGlyph = function(chr, glyph, scale, x, y) {
+TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
+	var chr = this.text.charAt(i);
 	var codepoint = chr.charCodeAt(0);
 	var cached = this.shapeCache[ codepoint ];
 	if (!cached) {
@@ -76,8 +80,12 @@ TriangleRenderer.prototype.renderGlyph = function(chr, glyph, scale, x, y) {
 	var context = this.context;
 
 	glyphCenter.set(glyph.width/2, glyph.height/2);
+	
+	var maxDistSq = this.animationDistance*this.animationDistance;
 
 	for (var i=0; i<cached.length; i+=3) {
+		var rnd = this.randomVectors[ i % this.randomVectors.length ];
+		
 		var a = cached[i+0];
 		var b = cached[i+1];
 		var c = cached[i+2];
@@ -87,22 +95,27 @@ TriangleRenderer.prototype.renderGlyph = function(chr, glyph, scale, x, y) {
 
 		tmpvec.x = center.x * scale + x;
 		tmpvec.y = center.y * -scale + y;
+		
+		//add some randomization into the distance check
+		tmpvec.x += rnd.x*10;
+		tmpvec.y += rnd.y*10;
 
-		var maxDist = 300;
-		var anim = 1-Math.max(0, Math.min(1, tmpvec.dist(this.animationOrigin)/maxDist));
-		// anim = 1;
+		var dist = tmpvec.distSq(this.animationOrigin)/maxDistSq;
+		var anim = 1-Math.max(0, Math.min(1, dist));
 
 		// get unit vector from triangle center to glyph center
 		tmpvec.copy(center).sub(glyphCenter).normalize();
 
 		// add some randomization to the explosion
-		var rnd = this.randomVectors[ i % this.randomVectors.length ];
 		tmpvec.add(rnd);
 
+		// explode the unit vector outward
 		tmpvec.scale(500 * this.explode);
 
+		// add the unit vector to move center
 		center.add(tmpvec);
 
+		//animate our vertices...
 		tmpvec.copy(a).lerp(center, anim);
 		context.moveTo(tmpvec.x * scale + x, tmpvec.y * -scale + y);
 
@@ -124,9 +137,6 @@ TriangleRenderer.prototype.renderUnderline = function(x, y, width, height) {
 TriangleRenderer.prototype.fill = function(context, x, y, start, end) {
 	if (!context)
 		throw "fill() must be specified with a canvas context";
-	if (this.triangles === null)
-		this.process();
-
 	this.context = context;
 	this.strokeUnderline = false;
 	context.beginPath();
@@ -137,9 +147,6 @@ TriangleRenderer.prototype.fill = function(context, x, y, start, end) {
 TriangleRenderer.prototype.stroke = function(context, x, y, start, end) {
 	if (!context)
 		throw "stroke() must be specified with a canvas context";
-	if (this.triangles === null)
-		this.process();
-
 	this.context = context;
 	this.strokeUnderline = true;
 	context.beginPath();
@@ -153,16 +160,8 @@ TriangleRenderer.prototype.release = function() {
 	this.shapeCache = {};
 };
 
-//Processes the current state into triangles. 
-TriangleRenderer.prototype.process = function() {
-	if (this.triangles === null)
-		this.triangles = [];
-
-	this.triangles.length = 0;
-};
-
 module.exports = TriangleRenderer;
-},{"../index.js":3,"fontpath-shape2d":9,"shape2d-triangulate":23,"vecmath":43}],2:[function(require,module,exports){
+},{"../index.js":3,"fontpath-shape2d":9,"interpolation":23,"shape2d-triangulate":24,"vecmath":44}],2:[function(require,module,exports){
 var test = require('canvas-testbed');
 
 var Vector2 = require('vecmath').Vector2;
@@ -175,13 +174,17 @@ var TriangleRenderer = require('./TriangleRenderer');
 // var text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
 var text = "Resize your browser for word wrap.";
 
+//padding we'll render the text from the top left edge
+var padding = 20;
+
 var renderer = new TriangleRenderer();
 
 //setup the text renderer
 renderer.text = text;
 renderer.font = Font;
 renderer.fontSize = 100;
-renderer.layout(window.innerWidth);
+renderer.align = 'left';
+renderer.layout(window.innerWidth-padding); 
 
 var textHeight = renderer.getBounds().height;
 
@@ -197,7 +200,7 @@ window.addEventListener("touchmove", function(ev) {
 
 //Update layout to window width
 window.addEventListener("resize", function() {
-	renderer.layout(window.innerWidth);
+	renderer.layout(window.innerWidth-padding);
 	textHeight = renderer.getBounds().height;
 });
 
@@ -206,25 +209,28 @@ function render(context, width, height) {
 	context.clearRect(0, 0, width, height);
 
 	//text is drawn with lower-left origin..
-	var x = 20,
-		y = 20+textHeight;
+	var x = padding,
+		y = padding+textHeight;
 
 	time += 0.1;
 	
+	renderer.animationDistance = 120;
+
 	//simple linear tween to the new mouse position
-	renderer.animationOrigin.lerp(mouse, 0.05);
+	renderer.animationOrigin.lerp(mouse, 0.02);
 
 	//animate the scaling effect
 	renderer.explode = Math.sin(time*0.1)/2+0.5;
 
 	//let's stroke the first word, and fill the rest
 	var space = text.indexOf(' ');
+	context.strokeStyle = '#555';
 	renderer.stroke(context, x, y, 0, space);	
 	renderer.fill(context, x, y, space);	
 }
 
-test(render, undefined, { once: false });
-},{"./TriangleRenderer":1,"canvas-testbed":4,"fontpath-test-fonts/lib/Alegreya-Regular.otf":21,"vecmath":43}],3:[function(require,module,exports){
+test(render);
+},{"./TriangleRenderer":1,"canvas-testbed":4,"fontpath-test-fonts/lib/Alegreya-Regular.otf":21,"vecmath":44}],3:[function(require,module,exports){
 var GlyphIterator = require('fontpath-glyph-iterator');
 var WordWrap = require('fontpath-wordwrap');
 
@@ -241,7 +247,6 @@ function TextRenderer(font, fontSize) {
     this.underlinePosition = undefined;
     this._text = "";
 }
-
 
 //Externally we use strings for parity with HTML5 canvas, better debugging, etc.
 TextRenderer.Align = {
@@ -445,6 +450,26 @@ TextRenderer.prototype.computeUnderlinePosition = function () {
         return (font.units_per_EM/4)*scale;
 };
 
+/**
+ * Gets the descent of the current font (assumes its size 
+ * is already set). This is an absolute (positive) value.
+ * 
+ * @return {[type]} [description]
+ */
+TextRenderer.prototype.getDescender = function () {
+    return Math.abs(this.iterator.fontScale * this.iterator.font.descender);
+};
+
+/**
+ * Gets the descent of the current font (assumes its size 
+ * is already set). This is an absolute (positive) value.
+ * 
+ * @return {[type]} [description]
+ */
+TextRenderer.prototype.getAscender = function () {
+    return Math.abs(this.iterator.fontScale * this.iterator.font.ascender);
+};
+
 //Signals for subclasses to optionally implmeent
 //This may be useful to stop/start paths with different fills
 TextRenderer.prototype.onBegin = function() { }
@@ -550,7 +575,7 @@ TextRenderer.prototype.render = function (x, y, start, end) {
                     underlineWidth = tx - underlineStartX;
                 }
 
-                this.renderGlyph(chr, glyph, scale, tx, ty);
+                this.renderGlyph(i, glyph, scale, tx, ty);
             }
 
             //Advance the iterator to the next glyph in the string
@@ -3898,6 +3923,8 @@ WordWrap.Line = function(start, end, width) {
 
 module.exports = WordWrap;
 },{}],23:[function(require,module,exports){
+module.exports=require(11)
+},{}],24:[function(require,module,exports){
 var poly2tri = require('poly2tri');
 var util = require('point-util');
 
@@ -4020,7 +4047,7 @@ module.exports = function (shapes, steinerPoints) {
     }
     return allTris;
 };
-},{"point-util":24,"poly2tri":30}],24:[function(require,module,exports){
+},{"point-util":25,"poly2tri":31}],25:[function(require,module,exports){
 module.exports.isClockwise = function(points) {
     var sum = 0;
     for (var i=0; i<points.length; i++) {
@@ -4089,9 +4116,9 @@ module.exports.getBounds = function(contour) {
         maxY: maxY
     };
 }
-},{}],25:[function(require,module,exports){
-module.exports={"version": "1.3.5"}
 },{}],26:[function(require,module,exports){
+module.exports={"version": "1.3.5"}
+},{}],27:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4272,7 +4299,7 @@ module.exports = AdvancingFront;
 module.exports.Node = Node;
 
 
-},{}],27:[function(require,module,exports){
+},{}],28:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4307,7 +4334,7 @@ module.exports = assert;
 
 
 
-},{}],28:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4584,7 +4611,7 @@ Point.dot = function(a, b) {
 
 module.exports = Point;
 
-},{"./xy":35}],29:[function(require,module,exports){
+},{"./xy":36}],30:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4638,7 +4665,7 @@ PointError.prototype.constructor = PointError;
 
 module.exports = PointError;
 
-},{"./xy":35}],30:[function(require,module,exports){
+},{"./xy":36}],31:[function(require,module,exports){
 (function (global){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
@@ -4758,7 +4785,7 @@ exports.triangulate = sweep.triangulate;
 exports.sweep = {Triangulate: sweep.triangulate};
 
 }).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../dist/version.json":25,"./point":28,"./pointerror":29,"./sweep":31,"./sweepcontext":32,"./triangle":33}],31:[function(require,module,exports){
+},{"../dist/version.json":26,"./point":29,"./pointerror":30,"./sweep":32,"./sweepcontext":33,"./triangle":34}],32:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -5594,7 +5621,7 @@ function flipScanEdgeEvent(tcx, ep, eq, flip_triangle, t, p) {
 
 exports.triangulate = triangulate;
 
-},{"./advancingfront":26,"./assert":27,"./pointerror":29,"./triangle":33,"./utils":34}],32:[function(require,module,exports){
+},{"./advancingfront":27,"./assert":28,"./pointerror":30,"./triangle":34,"./utils":35}],33:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6137,7 +6164,7 @@ SweepContext.prototype.meshClean = function(triangle) {
 
 module.exports = SweepContext;
 
-},{"./advancingfront":26,"./point":28,"./pointerror":29,"./sweep":31,"./triangle":33}],33:[function(require,module,exports){
+},{"./advancingfront":27,"./point":29,"./pointerror":30,"./sweep":32,"./triangle":34}],34:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6700,7 +6727,7 @@ Triangle.prototype.markConstrainedEdgeByPoints = function(p, q) {
 
 module.exports = Triangle;
 
-},{"./xy":35}],34:[function(require,module,exports){
+},{"./xy":36}],35:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6811,7 +6838,7 @@ function isAngleObtuse(pa, pb, pc) {
 exports.isAngleObtuse = isAngleObtuse;
 
 
-},{}],35:[function(require,module,exports){
+},{}],36:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6920,20 +6947,20 @@ module.exports = {
     equals: equals
 };
 
-},{}],36:[function(require,module,exports){
-module.exports=require(13)
 },{}],37:[function(require,module,exports){
-module.exports=require(14)
+module.exports=require(13)
 },{}],38:[function(require,module,exports){
+module.exports=require(14)
+},{}],39:[function(require,module,exports){
 module.exports=require(15)
-},{"./Matrix3":36,"./Vector3":40,"./common":42}],39:[function(require,module,exports){
+},{"./Matrix3":37,"./Vector3":41,"./common":43}],40:[function(require,module,exports){
 module.exports=require(16)
-},{}],40:[function(require,module,exports){
-module.exports=require(17)
 },{}],41:[function(require,module,exports){
+module.exports=require(17)
+},{}],42:[function(require,module,exports){
 module.exports=require(18)
-},{"./common":42}],42:[function(require,module,exports){
+},{"./common":43}],43:[function(require,module,exports){
 module.exports=require(19)
-},{}],43:[function(require,module,exports){
+},{}],44:[function(require,module,exports){
 arguments[4][20][0].apply(exports,arguments)
-},{"./Matrix3":36,"./Matrix4":37,"./Quaternion":38,"./Vector2":39,"./Vector3":40,"./Vector4":41}]},{},[2])
+},{"./Matrix3":37,"./Matrix4":38,"./Quaternion":39,"./Vector2":40,"./Vector3":41,"./Vector4":42}]},{},[2])
