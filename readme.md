@@ -17,11 +17,10 @@ This primarily targets left-to-right text layouts using Latin fonts.
 This is essentially an 'abstract' base class. It's up to the renderer to implement the glyph/underline drawing functions. Some examples of possible renderers:
 
 - Decompose a glyph outline into a series of path operations for HTML5 canvas (see [fontpath-canvas](https://github.com/mattdesl/fontpath-canvas))
-- Render the glyph as triangles for WebGL, using [shape2d-triangulate](https://github.com/mattdesl/shape2d-triangulate)
+- Render the glyph as triangles for WebGL, using [shape2d-triangulate](https://github.com/mattdesl/shape2d-triangulate) (see the [demo](demo))
 - Render the glyph as bitmap fonts, ideal for hinting and small, fixed-size fonts
 - Render the glyph as quadratic curves on the GPU
 - etc...
-
 
 ## usage
 
@@ -41,3 +40,11 @@ textRenderer.text = text;
 textRenderer.layout(wrapWidth);
 textRenderer.align = CanvasRenderer.Align.LEFT;
 ```
+
+## demo
+
+In the [demo](demo) folder is a simple implementation rendering triangles with some mouse interaction.
+
+[![http://i.imgur.com/7aJQwWz.png]](http://mattdesl.github.io/fontpath-renderer/demo/tris.html)
+
+You can [run the demo here](http://mattdesl.github.io/fontpath-renderer/demo/tris.html).
