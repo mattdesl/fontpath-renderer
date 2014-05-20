@@ -6,9 +6,9 @@ This simply lays out glyphs and underlines using [fontpath-wordwrap](https://git
 
 This primarily targets left-to-right text layouts using Latin fonts.
 
-- Word wraps text with 'normal', 'nowrap', or 'pre' modes
-- Wrapped text is aligned with 'left', 'center', or 'right'
-- Handles underline position and size based on font metrics (some fonts embed the underline thickness)
+- Word wraps text with `normal`, `nowrap`, or `pre` modes
+- Wrapped text is aligned with `left`, `center`, or `right`
+- Handles underline position and size based on font metrics (some fonts embed the underline metrics)
 - Provides a way to get the bounding box of the wrapped text
 - `start` and `end` indices provide a basic interface for styling different glyphs in a string
 
