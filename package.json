@@ -31,7 +31,8 @@
   },
   "homepage": "https://github.com/mattdesl/fontpath-renderer",
   "devDependencies": {
-    "canvas-testbed": "0.0.3"
+    "canvas-testbed": "0.0.3",
+    "interpolation": "0.0.1"
   },
   "optionalDependencies": {
     "fontpath-shape2d": "0.0.2",
