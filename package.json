@@ -37,11 +37,11 @@
     "fontpath-shape2d": "0.0.2",
     "shape2d-triangulate": "0.0.2",
     "vecmath": "^0.1.1",
+    "fontpath-shape2d": "0.0.3",
     "fontpath-test-fonts": "0.0.4"
   },
   "dependencies": {
     "fontpath-glyph-iterator": "0.0.0",
-    "fontpath-shape2d": "0.0.3",
     "fontpath-wordwrap": "0.0.0"
   }
 }
