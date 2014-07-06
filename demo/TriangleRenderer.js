@@ -82,6 +82,7 @@ TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
 	
 	var maxDistSq = this.animationDistance*this.animationDistance;
 
+
 	for (var i=0; i<cached.length; i+=3) {
 		var rnd = this.randomVectors[ i % this.randomVectors.length ];
 		
@@ -114,6 +115,10 @@ TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
 		// add the unit vector to move center
 		center.add(tmpvec);
 
+		context.beginPath();
+		context.fillStyle = 'hsl(0, 0%, '+ ~~(Math.random()*100) +'%)';
+
+
 		//animate our vertices...
 		tmpvec.copy(a).lerp(center, anim);
 		context.moveTo(tmpvec.x * scale + x, tmpvec.y * -scale + y);
@@ -126,6 +131,8 @@ TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
 
 		tmpvec.copy(a).lerp(center, anim);
 		context.lineTo(tmpvec.x * scale + x, tmpvec.y * -scale + y);
+
+		context.fill();
 	}
 };
 
@@ -138,9 +145,9 @@ TriangleRenderer.prototype.fill = function(context, x, y, start, end) {
 		throw "fill() must be specified with a canvas context";
 	this.context = context;
 	this.strokeUnderline = false;
-	context.beginPath();
+	
 	this.render(x, y, start, end);
-	context.fill();
+	
 };
 
 TriangleRenderer.prototype.stroke = function(context, x, y, start, end) {

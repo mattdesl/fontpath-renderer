@@ -31,7 +31,7 @@
   },
   "homepage": "https://github.com/mattdesl/fontpath-renderer",
   "devDependencies": {
-    "canvas-testbed": "0.0.3"
+    "canvas-testbed": "^0.2.0"
   },
   "optionalDependencies": {
     "fontpath-shape2d": "0.0.2",
@@ -41,7 +41,8 @@
     "canvas-testbed": "0.0.3"
   },
   "dependencies": {
-    "fontpath-wordwrap": "0.0.0",
-    "fontpath-glyph-iterator": "0.0.0"
+    "fontpath-glyph-iterator": "0.0.0",
+    "fontpath-shape2d": "0.0.3",
+    "fontpath-wordwrap": "0.0.0"
   }
 }

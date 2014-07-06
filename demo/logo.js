@@ -3,12 +3,12 @@ var test = require('canvas-testbed');
 var Vector2 = require('vecmath').Vector2;
 
 //the font we want to render
-var Font = require('fontpath-test-fonts/lib/Alegreya-Regular.otf');
+var Font = require('./norwester.json');
 
 var TriangleRenderer = require('./TriangleRenderer');
 
 // var text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit.";
-var text = "Resize your browser for word wrap.";
+var text = "KAMI.";
 
 //padding we'll render the text from the top left edge
 var padding = 20;
@@ -18,13 +18,13 @@ var renderer = new TriangleRenderer();
 //setup the text renderer
 renderer.text = text;
 renderer.font = Font;
-renderer.fontSize = 100;
+renderer.fontSize = 250;
 renderer.align = 'left';
 renderer.layout(window.innerWidth-padding); 
 
 var textHeight = renderer.getBounds().height;
 
-var mouse = new Vector2();
+var mouse = new Vector2(-10000,-10000);
 window.addEventListener("mousemove", function(ev) {
 	mouse.set(ev.clientX, ev.clientY);
 });
@@ -57,12 +57,13 @@ function render(context, width, height) {
 
 	//animate the scaling effect
 	renderer.explode = Math.sin(time*0.1)/2+0.5;
+	renderer.explode = 0;
 
 	//let's stroke the first word, and fill the rest
 	var space = text.indexOf(' ');
 	context.strokeStyle = '#555';
-	renderer.stroke(context, x, y, 0, space);	
-	renderer.fill(context, x, y, space);	
+	// renderer.stroke(context, x, y, 0, space);	
+	renderer.fill(context, x, y);	
 }
 
-test(render);
+test(render, { once: true });
