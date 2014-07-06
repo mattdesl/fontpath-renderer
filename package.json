@@ -1,6 +1,6 @@
 {
   "name": "fontpath-renderer",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "a generic text renderer for canvas/webgl/etc",
   "main": "index.js",
   "scripts": {
@@ -34,10 +34,9 @@
     "canvas-testbed": "^0.2.0"
   },
   "optionalDependencies": {
-    "fontpath-shape2d": "0.0.2",
+    "fontpath-shape2d": "0.0.3",
     "shape2d-triangulate": "0.0.2",
     "vecmath": "^0.1.1",
-    "fontpath-shape2d": "0.0.3",
     "fontpath-test-fonts": "0.0.4"
   },
   "dependencies": {
