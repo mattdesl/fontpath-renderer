@@ -186,8 +186,8 @@ TextRenderer.prototype.getBounds = function (includeUnderline, out) {
 TextRenderer.prototype.computeUnderlineHeight = function () {
     var font = this.font;
     var scale = this.iterator.fontScale;
-    if (this.underlineHeight===0||this.underlineHeight) {
-        return this.underlineHeight; 
+    if (this.underlineThickness===0||this.underlineThickness) {
+        return this.underlineThickness; 
     } else if (font.underline_thickness) {
         return font.underline_thickness * scale; 
     } else
