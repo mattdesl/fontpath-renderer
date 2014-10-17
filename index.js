@@ -190,7 +190,9 @@ TextRenderer.prototype.computeUnderlineHeight = function () {
         return this.underlineThickness; 
     } else if (font.underline_thickness) {
         return font.underline_thickness * scale; 
-    } else
+    } else if (font.bitmap)
+        return font.size/8;
+    else
         return (font.units_per_EM/8)*scale;
 };
 
@@ -213,8 +215,11 @@ TextRenderer.prototype.computeUnderlinePosition = function () {
         return this.underlinePosition; 
     } else if (font.underline_position) {
         return -font.underline_position * scale; 
-    } else 
+    } else if (font.bitmap) {
+        return font.size/4;
+    } else {
         return (font.units_per_EM/4)*scale;
+    }
 };
 
 /**
