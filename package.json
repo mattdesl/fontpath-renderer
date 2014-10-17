@@ -39,7 +39,8 @@
     "fontpath-test-fonts": "0.0.4"
   },
   "dependencies": {
-    "fontpath-wordwrap": "0.0.0",
-    "fontpath-glyph-iterator": "0.0.0"
+    "fontpath-glyph-iterator": "0.0.0",
+    "fontpath-util": "^2.0.0",
+    "fontpath-wordwrap": "0.0.0"
   }
 }
