@@ -13,14 +13,13 @@ var text = "Resize your browser for word wrap.";
 //padding we'll render the text from the top left edge
 var padding = 20;
 
-var renderer = new TriangleRenderer();
-
-//setup the text renderer
-renderer.text = text;
-renderer.font = Font;
-renderer.fontSize = 100;
-renderer.align = 'right';
-renderer.layout(window.innerWidth-padding); 
+var renderer = TriangleRenderer({
+	text: text,
+	font: Font,
+	fontSize: 100,
+	align: 'right',
+	wrapWidth: window.innerWidth-padding
+})
 
 var textHeight = renderer.getBounds().height;
 
