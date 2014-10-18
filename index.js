@@ -3,31 +3,43 @@ var WordWrap = require('fontpath-wordwrap');
 
 var tmpBounds = { x: 0, y: 0, width: 0, height: 0, glyphs: 0 };
 
-function TextRenderer(font, fontSize) {
-    this.iterator = new GlyphIterator(font, fontSize);
+function TextRenderer(options) {
+    if (!(this instanceof TextRenderer))
+        return new TextRenderer(options)
+    options = options||{}
+
+    this.iterator = new GlyphIterator(options.font, options.fontSize);
     this.wordwrap = new WordWrap();
 
-    this.align = TextRenderer.Align.LEFT;
+    this.align = 'left';
     this.underline = false;
 
     this.underlineThickness = undefined;
     this.underlinePosition = undefined;
     this._text = "";
-}
 
-//Externally we use strings for parity with HTML5 canvas, better debugging, etc.
-TextRenderer.Align = {
-    LEFT: 'left',
-    CENTER: 'center',
-    RIGHT: 'right'
-};
+    if (typeof options.align === 'string')
+        this.align = options.align
+    if (typeof options.underline === 'boolean')
+        this.underline = options.underline
+    if (typeof options.underlineThickness === 'number')
+        this.underlineThickness = options.underlineThickness
+    if (typeof options.underlinePosition === 'number')
+        this.underlinePosition = options.underlinePosition
+    if (typeof options.text === 'string')
+        this.text = options.text
+    if (typeof options.wrapMode === 'string')
+        this.wordwrap.mode = options.wrapMode
+    if (typeof options.wrapWidth === 'number')
+        this.layout(options.wrapWidth)
+}
 
 //Internally we will use integers to avoid string comparison for each glyph
 var LEFT_ALIGN = 0, CENTER_ALIGN = 1, RIGHT_ALIGN = 2;
 var ALIGN_ARRAY = [
-    TextRenderer.Align.LEFT, 
-    TextRenderer.Align.CENTER, 
-    TextRenderer.Align.RIGHT
+    'left', 
+    'center', 
+    'right'
 ];
 
 /**

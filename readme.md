@@ -6,7 +6,9 @@ A generic renderer for fontpath glyphs.
 
 **This is a low-level module** and is mostly used internally.
 
-Instead, you are encouraged to use [fontpath-canvas](https://github.com/mattdesl/fontpath-canvas) for 2D canvas, [fontpath-gl](https://github.com/mattdesl/fontpath-gl) for WebGL, or [fontpath-simple-renderer](https://github.com/mattdesl/fontpath-simple-renderer) for render-agnostic custom solutions.
+Instead, you are encouraged to use [fontpath-canvas](https://github.com/mattdesl/fontpath-canvas) for 2D canvas, [fontpath-gl](https://github.com/mattdesl/fontpath-gl) for WebGL, or [fontpath-simple-renderer](https://github.com/mattdesl/fontpath-simple-renderer) for basic render-agnostic custom solutions.
+
+However, this produces the least amount of GC thrashing, and is best suited for highly optimized font rendering. 
 
 [![NPM](https://nodei.co/npm/fontpath-renderer.png)](https://nodei.co/npm/fontpath-renderer/)
 

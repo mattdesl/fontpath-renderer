@@ -4,6 +4,7 @@ var TextRenderer = require('../index.js'); //require the fontpath-renderer base
 var smoothstep = require('interpolation').smoothstep;
 var decompose = require('fontpath-shape2d');
 var triangulate = require('shape2d-triangulate');
+var inherits = require('inherits');
 
 var Vector2 = require('vecmath').Vector2;
 var tmpvec = new Vector2();
@@ -15,8 +16,10 @@ var glyphCenter = new Vector2();
 //(e.g. basic ASCII)
 var MAX_CODE_POINT = 1024;
 
-function TriangleRenderer(font, fontSize) {
-	TextRenderer.call(this, font, fontSize);
+function TriangleRenderer(opt) {
+	if (!(this instanceof TriangleRenderer))
+		return new TriangleRenderer(opt);
+	TextRenderer.call(this, opt);
 
 	this.simplifyAmount = 0.05;
 	this.context = null;
@@ -40,11 +43,7 @@ function TriangleRenderer(font, fontSize) {
 }
 
 //inherits from TextRenderer
-TriangleRenderer.prototype = Object.create(TextRenderer.prototype);
-TriangleRenderer.constructor = TriangleRenderer;
-
-//copy statics
-TriangleRenderer.Align = TextRenderer.Align;
+inherits(TriangleRenderer, TextRenderer);
 
 TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
 	var chr = this.text.charAt(i);

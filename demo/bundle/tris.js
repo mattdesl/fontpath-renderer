@@ -1,10 +1,11 @@
-(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);throw new Error("Cannot find module '"+o+"'")}var f=n[o]={exports:{}};t[o][0].call(f.exports,function(e){var n=t[o][1][e];return s(n?n:e)},f,f.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
+(function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
 var TextRenderer = require('../index.js'); //require the fontpath-renderer base
 
 
 var smoothstep = require('interpolation').smoothstep;
 var decompose = require('fontpath-shape2d');
 var triangulate = require('shape2d-triangulate');
+var inherits = require('inherits');
 
 var Vector2 = require('vecmath').Vector2;
 var tmpvec = new Vector2();
@@ -16,8 +17,10 @@ var glyphCenter = new Vector2();
 //(e.g. basic ASCII)
 var MAX_CODE_POINT = 1024;
 
-function TriangleRenderer(font, fontSize) {
-	TextRenderer.call(this, font, fontSize);
+function TriangleRenderer(opt) {
+	if (!(this instanceof TriangleRenderer))
+		return new TriangleRenderer(opt);
+	TextRenderer.call(this, opt);
 
 	this.simplifyAmount = 0.05;
 	this.context = null;
@@ -41,11 +44,7 @@ function TriangleRenderer(font, fontSize) {
 }
 
 //inherits from TextRenderer
-TriangleRenderer.prototype = Object.create(TextRenderer.prototype);
-TriangleRenderer.constructor = TriangleRenderer;
-
-//copy statics
-TriangleRenderer.Align = TextRenderer.Align;
+inherits(TriangleRenderer, TextRenderer);
 
 TriangleRenderer.prototype.renderGlyph = function(i, glyph, scale, x, y) {
 	var chr = this.text.charAt(i);
@@ -161,7 +160,7 @@ TriangleRenderer.prototype.release = function() {
 };
 
 module.exports = TriangleRenderer;
-},{"../index.js":3,"fontpath-shape2d":9,"interpolation":23,"shape2d-triangulate":24,"vecmath":44}],2:[function(require,module,exports){
+},{"../index.js":3,"fontpath-shape2d":9,"inherits":15,"interpolation":16,"shape2d-triangulate":17,"vecmath":37}],2:[function(require,module,exports){
 var test = require('canvas-testbed');
 
 var Vector2 = require('vecmath').Vector2;
@@ -183,7 +182,7 @@ var renderer = new TriangleRenderer();
 renderer.text = text;
 renderer.font = Font;
 renderer.fontSize = 100;
-renderer.align = 'left';
+renderer.align = 'right';
 renderer.layout(window.innerWidth-padding); 
 
 var textHeight = renderer.getBounds().height;
@@ -230,37 +229,49 @@ function render(context, width, height) {
 }
 
 test(render);
-},{"./TriangleRenderer":1,"canvas-testbed":4,"fontpath-test-fonts/lib/Alegreya-Regular.otf":21,"vecmath":44}],3:[function(require,module,exports){
+},{"./TriangleRenderer":1,"canvas-testbed":4,"fontpath-test-fonts/lib/Alegreya-Regular.otf":13,"vecmath":37}],3:[function(require,module,exports){
 var GlyphIterator = require('fontpath-glyph-iterator');
 var WordWrap = require('fontpath-wordwrap');
 
 var tmpBounds = { x: 0, y: 0, width: 0, height: 0, glyphs: 0 };
 
-function TextRenderer(font, fontSize) {
-    this.iterator = new GlyphIterator(font, fontSize);
+function TextRenderer(options) {
+    if (!(this instanceof TextRenderer))
+        return new TextRenderer(options)
+    options = options||{}
+
+    this.iterator = new GlyphIterator(options.font, options.fontSize);
     this.wordwrap = new WordWrap();
 
-    this.align = TextRenderer.Align.LEFT;
+    this.align = 'left';
     this.underline = false;
 
     this.underlineThickness = undefined;
     this.underlinePosition = undefined;
     this._text = "";
-}
 
-//Externally we use strings for parity with HTML5 canvas, better debugging, etc.
-TextRenderer.Align = {
-    LEFT: 'left',
-    CENTER: 'center',
-    RIGHT: 'right'
-};
+    if (typeof options.align === 'string')
+        this.align = options.align
+    if (typeof options.underline === 'boolean')
+        this.underline = options.underline
+    if (typeof options.underlineThickness === 'number')
+        this.underlineThickness = options.underlineThickness
+    if (typeof options.underlinePosition === 'number')
+        this.underlinePosition = options.underlinePosition
+    if (typeof options.text === 'string')
+        this.text = options.text
+    if (typeof options.wrapMode === 'string')
+        this.wordwrap.mode = options.wrapMode
+    if (typeof options.wrapWidth === 'number')
+        this.layout(options.wrapWidth)
+}
 
 //Internally we will use integers to avoid string comparison for each glyph
 var LEFT_ALIGN = 0, CENTER_ALIGN = 1, RIGHT_ALIGN = 2;
 var ALIGN_ARRAY = [
-    TextRenderer.Align.LEFT, 
-    TextRenderer.Align.CENTER, 
-    TextRenderer.Align.RIGHT
+    'left', 
+    'center', 
+    'right'
 ];
 
 /**
@@ -419,11 +430,13 @@ TextRenderer.prototype.getBounds = function (includeUnderline, out) {
 TextRenderer.prototype.computeUnderlineHeight = function () {
     var font = this.font;
     var scale = this.iterator.fontScale;
-    if (this.underlineHeight===0||this.underlineHeight) {
-        return this.underlineHeight; 
+    if (this.underlineThickness===0||this.underlineThickness) {
+        return this.underlineThickness; 
     } else if (font.underline_thickness) {
         return font.underline_thickness * scale; 
-    } else
+    } else if (font.bitmap)
+        return font.size/8;
+    else
         return (font.units_per_EM/8)*scale;
 };
 
@@ -446,8 +459,11 @@ TextRenderer.prototype.computeUnderlinePosition = function () {
         return this.underlinePosition; 
     } else if (font.underline_position) {
         return -font.underline_position * scale; 
-    } else 
+    } else if (font.bitmap) {
+        return font.size/4;
+    } else {
         return (font.units_per_EM/4)*scale;
+    }
 };
 
 /**
@@ -604,7 +620,7 @@ TextRenderer.prototype.render = function (x, y, start, end) {
 };
 
 module.exports = TextRenderer;
-},{"fontpath-glyph-iterator":7,"fontpath-wordwrap":22}],4:[function(require,module,exports){
+},{"fontpath-glyph-iterator":7,"fontpath-wordwrap":14}],4:[function(require,module,exports){
 var domready = require('domready');
 require('raf.js');
 
@@ -688,8 +704,10 @@ module.exports = function( render, start, options ) {
 
   var fns = [], listener
     , doc = document
+    , hack = doc.documentElement.doScroll
     , domContentLoaded = 'DOMContentLoaded'
-    , loaded = /^loaded|^i|^c/.test(doc.readyState)
+    , loaded = (hack ? /^loaded|^c/ : /^loaded|^i|^c/).test(doc.readyState)
+
 
   if (!loaded)
   doc.addEventListener(domContentLoaded, listener = function () {
@@ -754,12 +772,15 @@ var DEFAULT_TAB_WIDTH = 4;
 
 function GlyphIterator(font, fontSize) {
     this._fontSize = undefined;
+    this._fontScale = undefined;
     this._font = undefined;
     this.fontScale = 1.0;
     this.kerning = true;
     this.lineHeight = undefined;
-
-    this.fontSize = fontSize;
+    
+    this.fontSize = typeof fontSize === 'number'
+            ? fontSize
+            : (font ? font.size : undefined);
     this.font = font;
 
     //Number of spaces for a tab character
@@ -813,6 +834,10 @@ Object.defineProperty(GlyphIterator.prototype, "tabWidth", {
 
 Object.defineProperty(GlyphIterator.prototype, "fontSize", {
     get: function() {
+        if (typeof this._fontSize !== 'number')
+            return this.font.bitmap 
+                ? this.font.size 
+                : util.pointToPixel(this.font.size)
         return this._fontSize;
     },
 
@@ -1061,6 +1086,9 @@ module.exports.pointToPixel = function(fontSize, dpi) {
  * @return {Number} returns the scale for this font size         
  */
 module.exports.getPxScale = function(font, fontSize) {
+    if (font.bitmap)
+        return 1.0;
+
     //If no fontSize is specified, it will just fall back to using the font's own size with 96 DPI.
     fontSize = typeof fontSize === "number" ? fontSize : this.pointToPixel(font.size);
 
@@ -1397,7 +1425,7 @@ var Shape = new Class({
 });
 
 module.exports = Shape;
-},{"interpolation":11,"klasse":12,"vecmath":20}],11:[function(require,module,exports){
+},{"interpolation":11,"klasse":12,"vecmath":37}],11:[function(require,module,exports){
 /** Utility function for linear interpolation. */
 module.exports.lerp = function(v0, v1, t) {
     return v0*(1-t)+v1*t;
@@ -1594,2114 +1622,9 @@ Class.ignoreFinals = false;
 
 module.exports = Class;
 },{}],13:[function(require,module,exports){
-var ARRAY_TYPE = typeof Float32Array !== "undefined" ? Float32Array : Array;
-
-function Matrix3(m) {
-    this.val = new ARRAY_TYPE(9);
-
-    if (m) { //assume Matrix3 with val
-        this.copy(m);
-    } else { //default to identity
-        this.idt();
-    }
-}
-
-var mat3 = Matrix3.prototype;
-
-mat3.clone = function() {
-    return new Matrix3(this);
-};
-
-mat3.set = function(otherMat) {
-    return this.copy(otherMat);
-};
-
-mat3.copy = function(otherMat) {
-    var out = this.val,
-        a = otherMat.val; 
-    out[0] = a[0];
-    out[1] = a[1];
-    out[2] = a[2];
-    out[3] = a[3];
-    out[4] = a[4];
-    out[5] = a[5];
-    out[6] = a[6];
-    out[7] = a[7];
-    out[8] = a[8];
-    return this;
-};
-
-mat3.fromMat4 = function(m) {
-    var a = m.val,
-        out = this.val;
-    out[0] = a[0];
-    out[1] = a[1];
-    out[2] = a[2];
-    out[3] = a[4];
-    out[4] = a[5];
-    out[5] = a[6];
-    out[6] = a[8];
-    out[7] = a[9];
-    out[8] = a[10];
-    return this;
-};
-
-mat3.fromArray = function(a) {
-    var out = this.val;
-    out[0] = a[0];
-    out[1] = a[1];
-    out[2] = a[2];
-    out[3] = a[3];
-    out[4] = a[4];
-    out[5] = a[5];
-    out[6] = a[6];
-    out[7] = a[7];
-    out[8] = a[8];
-    return this;
-};
-
-mat3.identity = function() {
-    var out = this.val;
-    out[0] = 1;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 1;
-    out[5] = 0;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 1;
-    return this;
-};
-
-mat3.transpose = function() {
-    var a = this.val,
-        a01 = a[1], 
-        a02 = a[2], 
-        a12 = a[5];
-    a[1] = a[3];
-    a[2] = a[6];
-    a[3] = a01;
-    a[5] = a[7];
-    a[6] = a02;
-    a[7] = a12;
-    return this;
-};
-
-mat3.invert = function() {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2],
-        a10 = a[3], a11 = a[4], a12 = a[5],
-        a20 = a[6], a21 = a[7], a22 = a[8],
-
-        b01 = a22 * a11 - a12 * a21,
-        b11 = -a22 * a10 + a12 * a20,
-        b21 = a21 * a10 - a11 * a20,
-
-        // Calculate the determinant
-        det = a00 * b01 + a01 * b11 + a02 * b21;
-
-    if (!det) { 
-        return null; 
-    }
-    det = 1.0 / det;
-
-    a[0] = b01 * det;
-    a[1] = (-a22 * a01 + a02 * a21) * det;
-    a[2] = (a12 * a01 - a02 * a11) * det;
-    a[3] = b11 * det;
-    a[4] = (a22 * a00 - a02 * a20) * det;
-    a[5] = (-a12 * a00 + a02 * a10) * det;
-    a[6] = b21 * det;
-    a[7] = (-a21 * a00 + a01 * a20) * det;
-    a[8] = (a11 * a00 - a01 * a10) * det;
-    return this;
-};
-
-mat3.adjoint = function() {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2],
-        a10 = a[3], a11 = a[4], a12 = a[5],
-        a20 = a[6], a21 = a[7], a22 = a[8];
-
-    a[0] = (a11 * a22 - a12 * a21);
-    a[1] = (a02 * a21 - a01 * a22);
-    a[2] = (a01 * a12 - a02 * a11);
-    a[3] = (a12 * a20 - a10 * a22);
-    a[4] = (a00 * a22 - a02 * a20);
-    a[5] = (a02 * a10 - a00 * a12);
-    a[6] = (a10 * a21 - a11 * a20);
-    a[7] = (a01 * a20 - a00 * a21);
-    a[8] = (a00 * a11 - a01 * a10);
-    return this;
-};
-
-mat3.determinant = function() {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2],
-        a10 = a[3], a11 = a[4], a12 = a[5],
-        a20 = a[6], a21 = a[7], a22 = a[8];
-
-    return a00 * (a22 * a11 - a12 * a21) + a01 * (-a22 * a10 + a12 * a20) + a02 * (a21 * a10 - a11 * a20);
-};
-
-mat3.multiply = function(otherMat) {
-    var a = this.val,
-        b = otherMat.val,
-        a00 = a[0], a01 = a[1], a02 = a[2],
-        a10 = a[3], a11 = a[4], a12 = a[5],
-        a20 = a[6], a21 = a[7], a22 = a[8],
-
-        b00 = b[0], b01 = b[1], b02 = b[2],
-        b10 = b[3], b11 = b[4], b12 = b[5],
-        b20 = b[6], b21 = b[7], b22 = b[8];
-
-    a[0] = b00 * a00 + b01 * a10 + b02 * a20;
-    a[1] = b00 * a01 + b01 * a11 + b02 * a21;
-    a[2] = b00 * a02 + b01 * a12 + b02 * a22;
-
-    a[3] = b10 * a00 + b11 * a10 + b12 * a20;
-    a[4] = b10 * a01 + b11 * a11 + b12 * a21;
-    a[5] = b10 * a02 + b11 * a12 + b12 * a22;
-
-    a[6] = b20 * a00 + b21 * a10 + b22 * a20;
-    a[7] = b20 * a01 + b21 * a11 + b22 * a21;
-    a[8] = b20 * a02 + b21 * a12 + b22 * a22;
-    return this;
-};
-
-mat3.translate = function(v) {
-    var a = this.val,
-        x = v.x, y = v.y;
-    a[6] = x * a[0] + y * a[3] + a[6];
-    a[7] = x * a[1] + y * a[4] + a[7];
-    a[8] = x * a[2] + y * a[5] + a[8];
-    return this;
-};
-
-mat3.rotate = function(rad) {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2],
-        a10 = a[3], a11 = a[4], a12 = a[5],
-
-        s = Math.sin(rad),
-        c = Math.cos(rad);
-
-    a[0] = c * a00 + s * a10;
-    a[1] = c * a01 + s * a11;
-    a[2] = c * a02 + s * a12;
-
-    a[3] = c * a10 - s * a00;
-    a[4] = c * a11 - s * a01;
-    a[5] = c * a12 - s * a02;
-    return this;
-};
-
-mat3.scale = function(v) {
-    var a = this.val,
-        x = v.x, 
-        y = v.y;
-
-    a[0] = x * a[0];
-    a[1] = x * a[1];
-    a[2] = x * a[2];
-
-    a[3] = y * a[3];
-    a[4] = y * a[4];
-    a[5] = y * a[5];
-    return this;
-};
-
-mat3.fromQuat = function(q) {
-    var x = q.x, y = q.y, z = q.z, w = q.w,
-        x2 = x + x,
-        y2 = y + y,
-        z2 = z + z,
-
-        xx = x * x2,
-        xy = x * y2,
-        xz = x * z2,
-        yy = y * y2,
-        yz = y * z2,
-        zz = z * z2,
-        wx = w * x2,
-        wy = w * y2,
-        wz = w * z2,
-
-        out = this.val;
-
-    out[0] = 1 - (yy + zz);
-    out[3] = xy + wz;
-    out[6] = xz - wy;
-
-    out[1] = xy - wz;
-    out[4] = 1 - (xx + zz);
-    out[7] = yz + wx;
-
-    out[2] = xz + wy;
-    out[5] = yz - wx;
-    out[8] = 1 - (xx + yy);
-    return this;
-};
-
-mat3.normalFromMat4 = function(m) {
-    var a = m.val,
-        out = this.val,
-
-        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
-
-        b00 = a00 * a11 - a01 * a10,
-        b01 = a00 * a12 - a02 * a10,
-        b02 = a00 * a13 - a03 * a10,
-        b03 = a01 * a12 - a02 * a11,
-        b04 = a01 * a13 - a03 * a11,
-        b05 = a02 * a13 - a03 * a12,
-        b06 = a20 * a31 - a21 * a30,
-        b07 = a20 * a32 - a22 * a30,
-        b08 = a20 * a33 - a23 * a30,
-        b09 = a21 * a32 - a22 * a31,
-        b10 = a21 * a33 - a23 * a31,
-        b11 = a22 * a33 - a23 * a32,
-
-        // Calculate the determinant
-        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-
-    if (!det) { 
-        return null; 
-    }
-    det = 1.0 / det;
-
-    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
-    out[1] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
-    out[2] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
-
-    out[3] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
-    out[4] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
-    out[5] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
-
-    out[6] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
-    out[7] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
-    out[8] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
-    return this;
-};
-
-mat3.mul = mat3.multiply;
-
-mat3.idt = mat3.identity;
-
-//This is handy for Pool utilities, to "reset" a
-//shared object to its default state
-mat3.reset = mat3.idt;
-
-mat3.toString = function() {
-    var a = this.val;
-    return 'Matrix3(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + 
-                    a[3] + ', ' + a[4] + ', ' + a[5] + ', ' + 
-                    a[6] + ', ' + a[7] + ', ' + a[8] + ')';
-};
-
-mat3.str = mat3.toString;
-
-module.exports = Matrix3;
-},{}],14:[function(require,module,exports){
-var ARRAY_TYPE = typeof Float32Array !== "undefined" ? Float32Array : Array;
-var EPSILON = 0.000001;
-
-function Matrix4(m) {
-    this.val = new ARRAY_TYPE(16);
-
-    if (m) { //assume Matrix4 with val
-        this.copy(m);
-    } else { //default to identity
-        this.idt();
-    }
-}
-
-var mat4 = Matrix4.prototype;
-
-mat4.clone = function() {
-    return new Matrix4(this);
-};
-
-mat4.set = function(otherMat) {
-    return this.copy(otherMat);
-};
-
-mat4.copy = function(otherMat) {
-    var out = this.val,
-        a = otherMat.val; 
-    out[0] = a[0];
-    out[1] = a[1];
-    out[2] = a[2];
-    out[3] = a[3];
-    out[4] = a[4];
-    out[5] = a[5];
-    out[6] = a[6];
-    out[7] = a[7];
-    out[8] = a[8];
-    out[9] = a[9];
-    out[10] = a[10];
-    out[11] = a[11];
-    out[12] = a[12];
-    out[13] = a[13];
-    out[14] = a[14];
-    out[15] = a[15];
-    return this;
-};
-
-mat4.fromArray = function(a) {
-    var out = this.val;
-    out[0] = a[0];
-    out[1] = a[1];
-    out[2] = a[2];
-    out[3] = a[3];
-    out[4] = a[4];
-    out[5] = a[5];
-    out[6] = a[6];
-    out[7] = a[7];
-    out[8] = a[8];
-    out[9] = a[9];
-    out[10] = a[10];
-    out[11] = a[11];
-    out[12] = a[12];
-    out[13] = a[13];
-    out[14] = a[14];
-    out[15] = a[15];
-    return this;
-};
-
-mat4.identity = function() {
-    var out = this.val;
-    out[0] = 1;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = 1;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = 1;
-    out[11] = 0;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = 0;
-    out[15] = 1;
-    return this;
-};
-
-mat4.transpose = function() {
-    var a = this.val,
-        a01 = a[1], a02 = a[2], a03 = a[3],
-        a12 = a[6], a13 = a[7],
-        a23 = a[11];
-
-    a[1] = a[4];
-    a[2] = a[8];
-    a[3] = a[12];
-    a[4] = a01;
-    a[6] = a[9];
-    a[7] = a[13];
-    a[8] = a02;
-    a[9] = a12;
-    a[11] = a[14];
-    a[12] = a03;
-    a[13] = a13;
-    a[14] = a23;
-    return this;
-};
-
-mat4.invert = function() {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
-
-        b00 = a00 * a11 - a01 * a10,
-        b01 = a00 * a12 - a02 * a10,
-        b02 = a00 * a13 - a03 * a10,
-        b03 = a01 * a12 - a02 * a11,
-        b04 = a01 * a13 - a03 * a11,
-        b05 = a02 * a13 - a03 * a12,
-        b06 = a20 * a31 - a21 * a30,
-        b07 = a20 * a32 - a22 * a30,
-        b08 = a20 * a33 - a23 * a30,
-        b09 = a21 * a32 - a22 * a31,
-        b10 = a21 * a33 - a23 * a31,
-        b11 = a22 * a33 - a23 * a32,
-
-        // Calculate the determinant
-        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-
-    if (!det) { 
-        return null; 
-    }
-    det = 1.0 / det;
-
-    a[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
-    a[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
-    a[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
-    a[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
-    a[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
-    a[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
-    a[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
-    a[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
-    a[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
-    a[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
-    a[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
-    a[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
-    a[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
-    a[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
-    a[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
-    a[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
-    return this;
-};
-
-mat4.adjoint = function() {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
-
-    a[0]  =  (a11 * (a22 * a33 - a23 * a32) - a21 * (a12 * a33 - a13 * a32) + a31 * (a12 * a23 - a13 * a22));
-    a[1]  = -(a01 * (a22 * a33 - a23 * a32) - a21 * (a02 * a33 - a03 * a32) + a31 * (a02 * a23 - a03 * a22));
-    a[2]  =  (a01 * (a12 * a33 - a13 * a32) - a11 * (a02 * a33 - a03 * a32) + a31 * (a02 * a13 - a03 * a12));
-    a[3]  = -(a01 * (a12 * a23 - a13 * a22) - a11 * (a02 * a23 - a03 * a22) + a21 * (a02 * a13 - a03 * a12));
-    a[4]  = -(a10 * (a22 * a33 - a23 * a32) - a20 * (a12 * a33 - a13 * a32) + a30 * (a12 * a23 - a13 * a22));
-    a[5]  =  (a00 * (a22 * a33 - a23 * a32) - a20 * (a02 * a33 - a03 * a32) + a30 * (a02 * a23 - a03 * a22));
-    a[6]  = -(a00 * (a12 * a33 - a13 * a32) - a10 * (a02 * a33 - a03 * a32) + a30 * (a02 * a13 - a03 * a12));
-    a[7]  =  (a00 * (a12 * a23 - a13 * a22) - a10 * (a02 * a23 - a03 * a22) + a20 * (a02 * a13 - a03 * a12));
-    a[8]  =  (a10 * (a21 * a33 - a23 * a31) - a20 * (a11 * a33 - a13 * a31) + a30 * (a11 * a23 - a13 * a21));
-    a[9]  = -(a00 * (a21 * a33 - a23 * a31) - a20 * (a01 * a33 - a03 * a31) + a30 * (a01 * a23 - a03 * a21));
-    a[10] =  (a00 * (a11 * a33 - a13 * a31) - a10 * (a01 * a33 - a03 * a31) + a30 * (a01 * a13 - a03 * a11));
-    a[11] = -(a00 * (a11 * a23 - a13 * a21) - a10 * (a01 * a23 - a03 * a21) + a20 * (a01 * a13 - a03 * a11));
-    a[12] = -(a10 * (a21 * a32 - a22 * a31) - a20 * (a11 * a32 - a12 * a31) + a30 * (a11 * a22 - a12 * a21));
-    a[13] =  (a00 * (a21 * a32 - a22 * a31) - a20 * (a01 * a32 - a02 * a31) + a30 * (a01 * a22 - a02 * a21));
-    a[14] = -(a00 * (a11 * a32 - a12 * a31) - a10 * (a01 * a32 - a02 * a31) + a30 * (a01 * a12 - a02 * a11));
-    a[15] =  (a00 * (a11 * a22 - a12 * a21) - a10 * (a01 * a22 - a02 * a21) + a20 * (a01 * a12 - a02 * a11));
-    return this;
-};
-
-mat4.determinant = function () {
-    var a = this.val,
-        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
-
-        b00 = a00 * a11 - a01 * a10,
-        b01 = a00 * a12 - a02 * a10,
-        b02 = a00 * a13 - a03 * a10,
-        b03 = a01 * a12 - a02 * a11,
-        b04 = a01 * a13 - a03 * a11,
-        b05 = a02 * a13 - a03 * a12,
-        b06 = a20 * a31 - a21 * a30,
-        b07 = a20 * a32 - a22 * a30,
-        b08 = a20 * a33 - a23 * a30,
-        b09 = a21 * a32 - a22 * a31,
-        b10 = a21 * a33 - a23 * a31,
-        b11 = a22 * a33 - a23 * a32;
-
-    // Calculate the determinant
-    return b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
-};
-
-mat4.multiply = function(otherMat) {
-    var a = this.val,
-        b = otherMat.val,
-        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
-        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
-        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
-        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
-
-    // Cache only the current line of the second matrix
-    var b0  = b[0], b1 = b[1], b2 = b[2], b3 = b[3];  
-    a[0] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
-    a[1] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
-    a[2] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
-    a[3] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
-
-    b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
-    a[4] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
-    a[5] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
-    a[6] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
-    a[7] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
-
-    b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
-    a[8] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
-    a[9] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
-    a[10] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
-    a[11] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
-
-    b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
-    a[12] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
-    a[13] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
-    a[14] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
-    a[15] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
-    return this;
-};
-
-mat4.translate = function(v) {
-    var x = v.x, y = v.y, z = v.z,
-        a = this.val;
-    a[12] = a[0] * x + a[4] * y + a[8] * z + a[12];
-    a[13] = a[1] * x + a[5] * y + a[9] * z + a[13];
-    a[14] = a[2] * x + a[6] * y + a[10] * z + a[14];
-    a[15] = a[3] * x + a[7] * y + a[11] * z + a[15];
-    return this;
-};
-
-mat4.scale = function(v) {
-    var x = v.x, y = v.y, z = v.z, a = this.val;
-
-    a[0] = a[0] * x;
-    a[1] = a[1] * x;
-    a[2] = a[2] * x;
-    a[3] = a[3] * x;
-    a[4] = a[4] * y;
-    a[5] = a[5] * y;
-    a[6] = a[6] * y;
-    a[7] = a[7] * y;
-    a[8] = a[8] * z;
-    a[9] = a[9] * z;
-    a[10] = a[10] * z;
-    a[11] = a[11] * z;
-    a[12] = a[12];
-    a[13] = a[13];
-    a[14] = a[14];
-    a[15] = a[15];
-    return this;
-};
-
-mat4.rotate = function (rad, axis) {
-    var a = this.val,
-        x = axis.x, y = axis.y, z = axis.z,
-        len = Math.sqrt(x * x + y * y + z * z),
-        s, c, t,
-        a00, a01, a02, a03,
-        a10, a11, a12, a13,
-        a20, a21, a22, a23,
-        b00, b01, b02,
-        b10, b11, b12,
-        b20, b21, b22;
-
-    if (Math.abs(len) < EPSILON) { return null; }
-    
-    len = 1 / len;
-    x *= len;
-    y *= len;
-    z *= len;
-
-    s = Math.sin(rad);
-    c = Math.cos(rad);
-    t = 1 - c;
-
-    a00 = a[0]; a01 = a[1]; a02 = a[2]; a03 = a[3];
-    a10 = a[4]; a11 = a[5]; a12 = a[6]; a13 = a[7];
-    a20 = a[8]; a21 = a[9]; a22 = a[10]; a23 = a[11];
-
-    // Construct the elements of the rotation matrix
-    b00 = x * x * t + c; b01 = y * x * t + z * s; b02 = z * x * t - y * s;
-    b10 = x * y * t - z * s; b11 = y * y * t + c; b12 = z * y * t + x * s;
-    b20 = x * z * t + y * s; b21 = y * z * t - x * s; b22 = z * z * t + c;
-
-    // Perform rotation-specific matrix multiplication
-    a[0] = a00 * b00 + a10 * b01 + a20 * b02;
-    a[1] = a01 * b00 + a11 * b01 + a21 * b02;
-    a[2] = a02 * b00 + a12 * b01 + a22 * b02;
-    a[3] = a03 * b00 + a13 * b01 + a23 * b02;
-    a[4] = a00 * b10 + a10 * b11 + a20 * b12;
-    a[5] = a01 * b10 + a11 * b11 + a21 * b12;
-    a[6] = a02 * b10 + a12 * b11 + a22 * b12;
-    a[7] = a03 * b10 + a13 * b11 + a23 * b12;
-    a[8] = a00 * b20 + a10 * b21 + a20 * b22;
-    a[9] = a01 * b20 + a11 * b21 + a21 * b22;
-    a[10] = a02 * b20 + a12 * b21 + a22 * b22;
-    a[11] = a03 * b20 + a13 * b21 + a23 * b22;
-    return this;
-};
-
-mat4.rotateX = function(rad) {
-    var a = this.val,
-        s = Math.sin(rad),
-        c = Math.cos(rad),
-        a10 = a[4],
-        a11 = a[5],
-        a12 = a[6],
-        a13 = a[7],
-        a20 = a[8],
-        a21 = a[9],
-        a22 = a[10],
-        a23 = a[11];
-
-    // Perform axis-specific matrix multiplication
-    a[4] = a10 * c + a20 * s;
-    a[5] = a11 * c + a21 * s;
-    a[6] = a12 * c + a22 * s;
-    a[7] = a13 * c + a23 * s;
-    a[8] = a20 * c - a10 * s;
-    a[9] = a21 * c - a11 * s;
-    a[10] = a22 * c - a12 * s;
-    a[11] = a23 * c - a13 * s;
-    return this;
-};
-
-mat4.rotateY = function(rad) {
-    var a = this.val,
-        s = Math.sin(rad),
-        c = Math.cos(rad),
-        a00 = a[0],
-        a01 = a[1],
-        a02 = a[2],
-        a03 = a[3],
-        a20 = a[8],
-        a21 = a[9],
-        a22 = a[10],
-        a23 = a[11];
-
-    // Perform axis-specific matrix multiplication
-    a[0] = a00 * c - a20 * s;
-    a[1] = a01 * c - a21 * s;
-    a[2] = a02 * c - a22 * s;
-    a[3] = a03 * c - a23 * s;
-    a[8] = a00 * s + a20 * c;
-    a[9] = a01 * s + a21 * c;
-    a[10] = a02 * s + a22 * c;
-    a[11] = a03 * s + a23 * c;
-    return this;
-};
-
-mat4.rotateZ = function (rad) {
-    var a = this.val,
-        s = Math.sin(rad),
-        c = Math.cos(rad),
-        a00 = a[0],
-        a01 = a[1],
-        a02 = a[2],
-        a03 = a[3],
-        a10 = a[4],
-        a11 = a[5],
-        a12 = a[6],
-        a13 = a[7];
-
-    // Perform axis-specific matrix multiplication
-    a[0] = a00 * c + a10 * s;
-    a[1] = a01 * c + a11 * s;
-    a[2] = a02 * c + a12 * s;
-    a[3] = a03 * c + a13 * s;
-    a[4] = a10 * c - a00 * s;
-    a[5] = a11 * c - a01 * s;
-    a[6] = a12 * c - a02 * s;
-    a[7] = a13 * c - a03 * s;
-    return this;
-};
-
-mat4.fromRotationTranslation = function (q, v) {
-    // Quaternion math
-    var out = this.val,
-        x = q.x, y = q.y, z = q.z, w = q.w,
-        x2 = x + x,
-        y2 = y + y,
-        z2 = z + z,
-
-        xx = x * x2,
-        xy = x * y2,
-        xz = x * z2,
-        yy = y * y2,
-        yz = y * z2,
-        zz = z * z2,
-        wx = w * x2,
-        wy = w * y2,
-        wz = w * z2;
-
-    out[0] = 1 - (yy + zz);
-    out[1] = xy + wz;
-    out[2] = xz - wy;
-    out[3] = 0;
-    out[4] = xy - wz;
-    out[5] = 1 - (xx + zz);
-    out[6] = yz + wx;
-    out[7] = 0;
-    out[8] = xz + wy;
-    out[9] = yz - wx;
-    out[10] = 1 - (xx + yy);
-    out[11] = 0;
-    out[12] = v.x;
-    out[13] = v.y;
-    out[14] = v.z;
-    out[15] = 1;
-    return this;
-};
-
-mat4.fromQuat = function (q) {
-    var out = this.val,
-        x = q.x, y = q.y, z = q.z, w = q.w,
-        x2 = x + x,
-        y2 = y + y,
-        z2 = z + z,
-
-        xx = x * x2,
-        xy = x * y2,
-        xz = x * z2,
-        yy = y * y2,
-        yz = y * z2,
-        zz = z * z2,
-        wx = w * x2,
-        wy = w * y2,
-        wz = w * z2;
-
-    out[0] = 1 - (yy + zz);
-    out[1] = xy + wz;
-    out[2] = xz - wy;
-    out[3] = 0;
-
-    out[4] = xy - wz;
-    out[5] = 1 - (xx + zz);
-    out[6] = yz + wx;
-    out[7] = 0;
-
-    out[8] = xz + wy;
-    out[9] = yz - wx;
-    out[10] = 1 - (xx + yy);
-    out[11] = 0;
-
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = 0;
-    out[15] = 1;
-
-    return this;
-};
-
-
-/**
- * Generates a frustum matrix with the given bounds
- *
- * @param {Number} left Left bound of the frustum
- * @param {Number} right Right bound of the frustum
- * @param {Number} bottom Bottom bound of the frustum
- * @param {Number} top Top bound of the frustum
- * @param {Number} near Near bound of the frustum
- * @param {Number} far Far bound of the frustum
- * @returns {Matrix4} this for chaining
- */
-mat4.frustum = function (left, right, bottom, top, near, far) {
-    var out = this.val,
-        rl = 1 / (right - left),
-        tb = 1 / (top - bottom),
-        nf = 1 / (near - far);
-    out[0] = (near * 2) * rl;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = (near * 2) * tb;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = (right + left) * rl;
-    out[9] = (top + bottom) * tb;
-    out[10] = (far + near) * nf;
-    out[11] = -1;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = (far * near * 2) * nf;
-    out[15] = 0;
-    return this;
-};
-
-
-/**
- * Generates a perspective projection matrix with the given bounds
- *
- * @param {number} fovy Vertical field of view in radians
- * @param {number} aspect Aspect ratio. typically viewport width/height
- * @param {number} near Near bound of the frustum
- * @param {number} far Far bound of the frustum
- * @returns {Matrix4} this for chaining
- */
-mat4.perspective = function (fovy, aspect, near, far) {
-    var out = this.val,
-        f = 1.0 / Math.tan(fovy / 2),
-        nf = 1 / (near - far);
-    out[0] = f / aspect;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = f;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = (far + near) * nf;
-    out[11] = -1;
-    out[12] = 0;
-    out[13] = 0;
-    out[14] = (2 * far * near) * nf;
-    out[15] = 0;
-    return this;
-};
-
-/**
- * Generates a orthogonal projection matrix with the given bounds
- *
- * @param {number} left Left bound of the frustum
- * @param {number} right Right bound of the frustum
- * @param {number} bottom Bottom bound of the frustum
- * @param {number} top Top bound of the frustum
- * @param {number} near Near bound of the frustum
- * @param {number} far Far bound of the frustum
- * @returns {Matrix4} this for chaining
- */
-mat4.ortho = function (left, right, bottom, top, near, far) {
-    var out = this.val,
-        lr = 1 / (left - right),
-        bt = 1 / (bottom - top),
-        nf = 1 / (near - far);
-    out[0] = -2 * lr;
-    out[1] = 0;
-    out[2] = 0;
-    out[3] = 0;
-    out[4] = 0;
-    out[5] = -2 * bt;
-    out[6] = 0;
-    out[7] = 0;
-    out[8] = 0;
-    out[9] = 0;
-    out[10] = 2 * nf;
-    out[11] = 0;
-    out[12] = (left + right) * lr;
-    out[13] = (top + bottom) * bt;
-    out[14] = (far + near) * nf;
-    out[15] = 1;
-    return this;
-};
-
-/**
- * Generates a look-at matrix with the given eye position, focal point, and up axis
- *
- * @param {Vector3} eye Position of the viewer
- * @param {Vector3} center Point the viewer is looking at
- * @param {Vector3} up vec3 pointing up
- * @returns {Matrix4} this for chaining
- */
-mat4.lookAt = function (eye, center, up) {
-    var out = this.val,
-
-        x0, x1, x2, y0, y1, y2, z0, z1, z2, len,
-        eyex = eye.x,
-        eyey = eye.y,
-        eyez = eye.z,
-        upx = up.x,
-        upy = up.y,
-        upz = up.z,
-        centerx = center.x,
-        centery = center.y,
-        centerz = center.z;
-
-    if (Math.abs(eyex - centerx) < EPSILON &&
-        Math.abs(eyey - centery) < EPSILON &&
-        Math.abs(eyez - centerz) < EPSILON) {
-        return this.identity();
-    }
-
-    z0 = eyex - centerx;
-    z1 = eyey - centery;
-    z2 = eyez - centerz;
-
-    len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
-    z0 *= len;
-    z1 *= len;
-    z2 *= len;
-
-    x0 = upy * z2 - upz * z1;
-    x1 = upz * z0 - upx * z2;
-    x2 = upx * z1 - upy * z0;
-    len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
-    if (!len) {
-        x0 = 0;
-        x1 = 0;
-        x2 = 0;
-    } else {
-        len = 1 / len;
-        x0 *= len;
-        x1 *= len;
-        x2 *= len;
-    }
-
-    y0 = z1 * x2 - z2 * x1;
-    y1 = z2 * x0 - z0 * x2;
-    y2 = z0 * x1 - z1 * x0;
-
-    len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
-    if (!len) {
-        y0 = 0;
-        y1 = 0;
-        y2 = 0;
-    } else {
-        len = 1 / len;
-        y0 *= len;
-        y1 *= len;
-        y2 *= len;
-    }
-
-    out[0] = x0;
-    out[1] = y0;
-    out[2] = z0;
-    out[3] = 0;
-    out[4] = x1;
-    out[5] = y1;
-    out[6] = z1;
-    out[7] = 0;
-    out[8] = x2;
-    out[9] = y2;
-    out[10] = z2;
-    out[11] = 0;
-    out[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
-    out[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
-    out[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
-    out[15] = 1;
-
-    return this;
-};
-
-
-mat4.mul = mat4.multiply;
-
-mat4.idt = mat4.identity;
-
-//This is handy for Pool utilities, to "reset" a
-//shared object to its default state
-mat4.reset = mat4.idt;
-
-mat4.toString = function () {
-    var a = this.val;
-    return 'Matrix4(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + a[3] + ', ' +
-                    a[4] + ', ' + a[5] + ', ' + a[6] + ', ' + a[7] + ', ' +
-                    a[8] + ', ' + a[9] + ', ' + a[10] + ', ' + a[11] + ', ' + 
-                    a[12] + ', ' + a[13] + ', ' + a[14] + ', ' + a[15] + ')';
-};
-
-mat4.str = mat4.toString;
-
-module.exports = Matrix4;
-
-},{}],15:[function(require,module,exports){
-var Vector3 = require('./Vector3');
-var Matrix3 = require('./Matrix3');
-var common = require('./common');
-
-//some shared 'private' arrays
-var s_iNext = (typeof Int8Array !== 'undefined' ? new Int8Array([1,2,0]) : [1,2,0]);
-var tmp = (typeof Float32Array !== 'undefined' ? new Float32Array([0,0,0]) : [0,0,0]);
-
-var xUnitVec3 = new Vector3(1, 0, 0);
-var yUnitVec3 = new Vector3(0, 1, 0);
-var tmpvec = new Vector3();
-
-var tmpMat3 = new Matrix3();
-
-function Quaternion(x, y, z, w) {
-	if (typeof x === "object") {
-        this.x = x.x||0;
-        this.y = x.y||0;
-        this.z = x.z||0;
-        this.w = x.w||0;
-    } else {
-        this.x = x||0;
-        this.y = y||0;
-        this.z = z||0;
-        this.w = w||0;
-    }
-}
-
-var quat = Quaternion.prototype;
-
-//mixin common functions
-for (var k in common) {
-    quat[k] = common[k];
-}
-
-quat.rotationTo = function(a, b) {
-    var dot = a.x * b.x + a.y * b.y + a.z * b.z; //a.dot(b)
-    if (dot < -0.999999) {
-        if (tmpvec.copy(xUnitVec3).cross(a).len() < 0.000001)
-            tmpvec.copy(yUnitVec3).cross(a);
-        
-        tmpvec.normalize();
-        return this.setAxisAngle(tmpvec, Math.PI);
-    } else if (dot > 0.999999) {
-        this.x = 0;
-        this.y = 0;
-        this.z = 0;
-        this.w = 1;
-        return this;
-    } else {
-        tmpvec.copy(a).cross(b);
-        this.x = tmpvec.x;
-        this.y = tmpvec.y;
-        this.z = tmpvec.z;
-        this.w = 1 + dot;
-        return this.normalize();
-    }
-};
-
-quat.setAxes = function(view, right, up) {
-    var m = tmpMat3.val;
-    m[0] = right.x;
-    m[3] = right.y;
-    m[6] = right.z;
-
-    m[1] = up.x;
-    m[4] = up.y;
-    m[7] = up.z;
-
-    m[2] = -view.x;
-    m[5] = -view.y;
-    m[8] = -view.z;
-
-    return this.fromMat3(tmpMat3).normalize();
-};
-
-quat.identity = function() {
-    this.x = this.y = this.z = 0;
-    this.w = 1;
-    return this;
-};
-
-quat.setAxisAngle = function(axis, rad) {
-    rad = rad * 0.5;
-    var s = Math.sin(rad);
-    this.x = s * axis.x;
-    this.y = s * axis.y;
-    this.z = s * axis.z;
-    this.w = Math.cos(rad);
-    return this;
-};
-
-quat.multiply = function(b) {
-    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
-        bx = b.x, by = b.y, bz = b.z, bw = b.w;
-
-    this.x = ax * bw + aw * bx + ay * bz - az * by;
-    this.y = ay * bw + aw * by + az * bx - ax * bz;
-    this.z = az * bw + aw * bz + ax * by - ay * bx;
-    this.w = aw * bw - ax * bx - ay * by - az * bz;
-    return this;
-};
-
-quat.slerp = function (b, t) {
-    // benchmarks:
-    //    http://jsperf.com/quaternion-slerp-implementations
-
-    var ax = this.x, ay = this.y, az = this.y, aw = this.y,
-        bx = b.x, by = b.y, bz = b.z, bw = b.w;
-
-    var        omega, cosom, sinom, scale0, scale1;
-
-    // calc cosine
-    cosom = ax * bx + ay * by + az * bz + aw * bw;
-    // adjust signs (if necessary)
-    if ( cosom < 0.0 ) {
-        cosom = -cosom;
-        bx = - bx;
-        by = - by;
-        bz = - bz;
-        bw = - bw;
-    }
-    // calculate coefficients
-    if ( (1.0 - cosom) > 0.000001 ) {
-        // standard case (slerp)
-        omega  = Math.acos(cosom);
-        sinom  = Math.sin(omega);
-        scale0 = Math.sin((1.0 - t) * omega) / sinom;
-        scale1 = Math.sin(t * omega) / sinom;
-    } else {        
-        // "from" and "to" quaternions are very close 
-        //  ... so we can do a linear interpolation
-        scale0 = 1.0 - t;
-        scale1 = t;
-    }
-    // calculate final values
-    this.x = scale0 * ax + scale1 * bx;
-    this.y = scale0 * ay + scale1 * by;
-    this.z = scale0 * az + scale1 * bz;
-    this.w = scale0 * aw + scale1 * bw;
-    return this;
-};
-
-quat.invert = function() {
-    var a0 = this.x, a1 = this.y, a2 = this.z, a3 = this.w,
-        dot = a0*a0 + a1*a1 + a2*a2 + a3*a3,
-        invDot = dot ? 1.0/dot : 0;
-    
-    // TODO: Would be faster to return [0,0,0,0] immediately if dot == 0
-
-    this.x = -a0*invDot;
-    this.y = -a1*invDot;
-    this.z = -a2*invDot;
-    this.w = a3*invDot;
-    return this;
-};
-
-quat.conjugate = function() {
-    this.x = -this.x;
-    this.y = -this.y;
-    this.z = -this.z;
-    return this;
-};
-
-quat.rotateX = function (rad) {
-    rad *= 0.5; 
-
-    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
-        bx = Math.sin(rad), bw = Math.cos(rad);
-
-    this.x = ax * bw + aw * bx;
-    this.y = ay * bw + az * bx;
-    this.z = az * bw - ay * bx;
-    this.w = aw * bw - ax * bx;
-    return this;
-};
-
-quat.rotateY = function (rad) {
-    rad *= 0.5; 
-
-    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
-        by = Math.sin(rad), bw = Math.cos(rad);
-
-    this.x = ax * bw - az * by;
-    this.y = ay * bw + aw * by;
-    this.z = az * bw + ax * by;
-    this.w = aw * bw - ay * by;
-    return this;
-};
-
-quat.rotateZ = function (rad) {
-    rad *= 0.5; 
-
-    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
-        bz = Math.sin(rad), bw = Math.cos(rad);
-
-    this.x = ax * bw + ay * bz;
-    this.y = ay * bw - ax * bz;
-    this.z = az * bw + aw * bz;
-    this.w = aw * bw - az * bz;
-    return this;
-};
-
-quat.calculateW = function () {
-    var x = this.x, y = this.y, z = this.z;
-
-    this.x = x;
-    this.y = y;
-    this.z = z;
-    this.w = -Math.sqrt(Math.abs(1.0 - x * x - y * y - z * z));
-    return this;
-};
-
-quat.fromMat3 = function(mat) {
-    // benchmarks:
-    //    http://jsperf.com/typed-array-access-speed
-    //    http://jsperf.com/conversion-of-3x3-matrix-to-quaternion
-
-    // Algorithm in Ken Shoemake's article in 1987 SIGGRAPH course notes
-    // article "Quaternion Calculus and Fast Animation".
-    var m = mat.val,
-        fTrace = m[0] + m[4] + m[8];
-    var fRoot;
-
-    if ( fTrace > 0.0 ) {
-        // |w| > 1/2, may as well choose w > 1/2
-        fRoot = Math.sqrt(fTrace + 1.0);  // 2w
-        this.w = 0.5 * fRoot;
-        fRoot = 0.5/fRoot;  // 1/(4w)
-        this.x = (m[7]-m[5])*fRoot;
-        this.y = (m[2]-m[6])*fRoot;
-        this.z = (m[3]-m[1])*fRoot;
-    } else {
-        // |w| <= 1/2
-        var i = 0;
-        if ( m[4] > m[0] )
-          i = 1;
-        if ( m[8] > m[i*3+i] )
-          i = 2;
-        var j = s_iNext[i];
-        var k = s_iNext[j];
-            
-        //This isn't quite as clean without array access...
-        fRoot = Math.sqrt(m[i*3+i]-m[j*3+j]-m[k*3+k] + 1.0);
-        tmp[i] = 0.5 * fRoot;
-
-        fRoot = 0.5 / fRoot;
-        tmp[j] = (m[j*3+i] + m[i*3+j]) * fRoot;
-        tmp[k] = (m[k*3+i] + m[i*3+k]) * fRoot;
-
-        this.x = tmp[0];
-        this.y = tmp[1];
-        this.z = tmp[2];
-        this.w = (m[k*3+j] - m[j*3+k]) * fRoot;
-    }
-    
-    return this;
-};
-
-quat.idt = quat.identity;
-
-quat.sub = quat.subtract;
-
-quat.mul = quat.multiply;
-
-quat.len = quat.length;
-
-quat.lenSq = quat.lengthSq;
-
-//This is handy for Pool utilities, to "reset" a
-//shared object to its default state
-quat.reset = quat.idt;
-
-
-quat.toString = function() {
-    return 'Quaternion(' + this.x + ', ' + this.y + ', ' + this.z + ', ' + this.w + ')';
-};
-
-quat.str = quat.toString;
-
-module.exports = Quaternion;
-},{"./Matrix3":13,"./Vector3":17,"./common":19}],16:[function(require,module,exports){
-function Vector2(x, y) {
-	if (typeof x === "object") {
-        this.x = x.x||0;
-        this.y = x.y||0;
-    } else {
-        this.x = x||0;
-        this.y = y||0;
-    }
-}
-
-//shorthand it for better minification
-var vec2 = Vector2.prototype;
-
-/**
- * Returns a new instance of Vector2 with
- * this vector's components. 
- * @return {Vector2} a clone of this vector
- */
-vec2.clone = function() {
-    return new Vector2(this.x, this.y);
-};
-
-/**
- * Copies the x, y components from the specified
- * Vector. Any undefined components from `otherVec`
- * will default to zero.
- * 
- * @param  {otherVec} the other Vector2 to copy
- * @return {Vector2}  this, for chaining
- */
-vec2.copy = function(otherVec) {
-    this.x = otherVec.x||0;
-    this.y = otherVec.y||0;
-    return this;
-};
-
-/**
- * A convenience function to set the components of
- * this vector as x and y. Falsy or undefined
- * parameters will default to zero.
- *
- * You can also pass a vector object instead of
- * individual components, to copy the object's components.
- * 
- * @param {Number} x the x component
- * @param {Number} y the y component
- * @return {Vector2}  this, for chaining
- */
-vec2.set = function(x, y) {
-    if (typeof x === "object") {
-        this.x = x.x||0;
-        this.y = x.y||0;
-    } else {
-        this.x = x||0;
-        this.y = y||0;
-    }
-    return this;
-};
-
-vec2.add = function(v) {
-    this.x += v.x;
-    this.y += v.y;
-    return this;
-};
-
-vec2.subtract = function(v) {
-    this.x -= v.x;
-    this.y -= v.y;
-    return this;
-};
-
-vec2.multiply = function(v) {
-    this.x *= v.x;
-    this.y *= v.y;
-    return this;
-};
-
-vec2.scale = function(s) {
-    this.x *= s;
-    this.y *= s;
-    return this;
-};
-
-vec2.divide = function(v) {
-    this.x /= v.x;
-    this.y /= v.y;
-    return this;
-};
-
-vec2.negate = function() {
-    this.x = -this.x;
-    this.y = -this.y;
-    return this;
-};
-
-vec2.distance = function(v) {
-    var dx = v.x - this.x,
-        dy = v.y - this.y;
-    return Math.sqrt(dx*dx + dy*dy);
-};
-
-vec2.distanceSq = function(v) {
-    var dx = v.x - this.x,
-        dy = v.y - this.y;
-    return dx*dx + dy*dy;
-};
-
-vec2.length = function() {
-    var x = this.x,
-        y = this.y;
-    return Math.sqrt(x*x + y*y);
-};
-
-vec2.lengthSq = function() {
-    var x = this.x,
-        y = this.y;
-    return x*x + y*y;
-};
-
-vec2.normalize = function() {
-    var x = this.x,
-        y = this.y;
-    var len = x*x + y*y;
-    if (len > 0) {
-        len = 1 / Math.sqrt(len);
-        this.x = x*len;
-        this.y = y*len;
-    }
-    return this;
-};
-
-vec2.dot = function(v) {
-    return this.x * v.x + this.y * v.y;
-};
-
-//Unlike Vector3, this returns a scalar
-//http://allenchou.net/2013/07/cross-product-of-2d-vectors/
-vec2.cross = function(v) {
-    return this.x * v.y - this.y * v.x;
-};
-
-vec2.lerp = function(v, t) {
-    var ax = this.x,
-        ay = this.y;
-    t = t||0;
-    this.x = ax + t * (v.x - ax);
-    this.y = ay + t * (v.y - ay);
-    return this;
-};
-
-vec2.transformMat3 = function(mat) {
-    var x = this.x, y = this.y, m = mat.val;
-    this.x = m[0] * x + m[3] * y + m[6];
-    this.y = m[1] * x + m[4] * y + m[7];
-    return this;
-};
-
-vec2.transformMat4 = function(mat) {
-    var x = this.x, 
-        y = this.y,
-        m = mat.val;
-    this.x = m[0] * x + m[4] * y + m[12];
-    this.y = m[1] * x + m[5] * y + m[13];
-    return this;
-};
-
-vec2.reset = function() {
-    this.x = 0;
-    this.y = 0;
-    return this;
-};
-
-vec2.sub = vec2.subtract;
-
-vec2.mul = vec2.multiply;
-
-vec2.div = vec2.divide;
-
-vec2.dist = vec2.distance;
-
-vec2.distSq = vec2.distanceSq;
-
-vec2.len = vec2.length;
-
-vec2.lenSq = vec2.lengthSq;
-
-vec2.toString = function() {
-    return 'Vector2(' + this.x + ', ' + this.y + ')';
-};
-
-vec2.random = function(scale) {
-    scale = scale || 1.0;
-    var r = Math.random() * 2.0 * Math.PI;
-    this.x = Math.cos(r) * scale;
-    this.y = Math.sin(r) * scale;
-    return this;
-};
-
-vec2.str = vec2.toString;
-
-module.exports = Vector2;
-},{}],17:[function(require,module,exports){
-function Vector3(x, y, z) {
-    if (typeof x === "object") {
-        this.x = x.x||0;
-        this.y = x.y||0;
-        this.z = x.z||0;
-    } else {
-        this.x = x||0;
-        this.y = y||0;
-        this.z = z||0;
-    }
-}
-
-//shorthand it for better minification
-var vec3 = Vector3.prototype;
-
-vec3.clone = function() {
-    return new Vector3(this.x, this.y, this.z);
-};
-
-vec3.copy = function(otherVec) {
-    this.x = otherVec.x;
-    this.y = otherVec.y;
-    this.z = otherVec.z;
-    return this;
-};
-
-vec3.set = function(x, y, z) {
-    if (typeof x === "object") {
-        this.x = x.x||0;
-        this.y = x.y||0;
-        this.z = x.z||0;
-    } else {
-        this.x = x||0;
-        this.y = y||0;
-        this.z = z||0;
-    }
-    return this;
-};
-
-vec3.add = function(v) {
-    this.x += v.x;
-    this.y += v.y;
-    this.z += v.z;
-    return this;
-};
-
-vec3.subtract = function(v) {
-    this.x -= v.x;
-    this.y -= v.y;
-    this.z -= v.z;
-    return this;
-};
-
-vec3.multiply = function(v) {
-    this.x *= v.x;
-    this.y *= v.y;
-    this.z *= v.z;
-    return this;
-};
-
-vec3.scale = function(s) {
-    this.x *= s;
-    this.y *= s;
-    this.z *= s;
-    return this;
-};
-
-vec3.divide = function(v) {
-    this.x /= v.x;
-    this.y /= v.y;
-    this.z /= v.z;
-    return this;
-};
-
-vec3.negate = function() {
-    this.x = -this.x;
-    this.y = -this.y;
-    this.z = -this.z;
-    return this;
-};
-
-vec3.distance = function(v) {
-    var dx = v.x - this.x,
-        dy = v.y - this.y,
-        dz = v.z - this.z;
-    return Math.sqrt(dx*dx + dy*dy + dz*dz);
-};
-
-vec3.distanceSq = function(v) {
-    var dx = v.x - this.x,
-        dy = v.y - this.y,
-        dz = v.z - this.z;
-    return dx*dx + dy*dy + dz*dz;
-};
-
-vec3.length = function() {
-    var x = this.x,
-        y = this.y,
-        z = this.z;
-    return Math.sqrt(x*x + y*y + z*z);
-};
-
-vec3.lengthSq = function() {
-    var x = this.x,
-        y = this.y,
-        z = this.z;
-    return x*x + y*y + z*z;
-};
-
-vec3.normalize = function() {
-    var x = this.x,
-        y = this.y,
-        z = this.z;
-    var len = x*x + y*y + z*z;
-    if (len > 0) {
-        len = 1 / Math.sqrt(len);
-        this.x = x*len;
-        this.y = y*len;
-        this.z = z*len;
-    }
-    return this;
-};
-
-vec3.dot = function(v) {
-    return this.x * v.x + this.y * v.y + this.z * v.z;
-};
-
-vec3.cross = function(v) {
-    var ax = this.x, ay = this.y, az = this.z,
-        bx = v.x, by = v.y, bz = v.z;
-
-    this.x = ay * bz - az * by;
-    this.y = az * bx - ax * bz;
-    this.z = ax * by - ay * bx;
-    return this;
-};
-
-vec3.lerp = function(v, t) {
-    var ax = this.x,
-        ay = this.y,
-        az = this.z;
-    t = t||0;
-    this.x = ax + t * (v.x - ax);
-    this.y = ay + t * (v.y - ay);
-    this.z = az + t * (v.z - az);
-    return this;
-};
-
-vec3.transformMat4 = function(mat) {
-    var x = this.x, y = this.y, z = this.z, m = mat.val;
-    this.x = m[0] * x + m[4] * y + m[8] * z + m[12];
-    this.y = m[1] * x + m[5] * y + m[9] * z + m[13];
-    this.z = m[2] * x + m[6] * y + m[10] * z + m[14];
-    return this;
-};
-
-vec3.transformMat3 = function(mat) {
-    var x = this.x, y = this.y, z = this.z, m = mat.val;
-    this.x = x * m[0] + y * m[3] + z * m[6];
-    this.y = x * m[1] + y * m[4] + z * m[7];
-    this.z = x * m[2] + y * m[5] + z * m[8];
-    return this;
-};
-
-vec3.transformQuat = function(q) {
-    // benchmarks: http://jsperf.com/quaternion-transform-vec3-implementations
-    var x = this.x, y = this.y, z = this.z,
-        qx = q.x, qy = q.y, qz = q.z, qw = q.w,
-
-        // calculate quat * vec
-        ix = qw * x + qy * z - qz * y,
-        iy = qw * y + qz * x - qx * z,
-        iz = qw * z + qx * y - qy * x,
-        iw = -qx * x - qy * y - qz * z;
-
-    // calculate result * inverse quat
-    this.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
-    this.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
-    this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
-    return this;
-};
-
-/**
- * Multiplies this Vector3 by the specified matrix, 
- * applying a W divide. This is useful for projection,
- * e.g. unprojecting a 2D point into 3D space.
- *
- * @method  prj
- * @param {Matrix4} the 4x4 matrix to multiply with 
- * @return {Vector3} this object for chaining
- */
-vec3.project = function(mat) {
-    var x = this.x,
-        y = this.y,
-        z = this.z,
-        m = mat.val,
-        a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3],
-        a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7],
-        a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11],
-        a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15];
-
-    var l_w = 1 / (x * a03 + y * a13 + z * a23 + a33);
-
-    this.x = (x * a00 + y * a10 + z * a20 + a30) * l_w; 
-    this.y = (x * a01 + y * a11 + z * a21 + a31) * l_w; 
-    this.z = (x * a02 + y * a12 + z * a22 + a32) * l_w;
-    return this;
-};
-
-/**
- * Unproject this point from 2D space to 3D space.
- * The point should have its x and y properties set to
- * 2D screen space, and the z either at 0 (near plane)
- * or 1 (far plane). The provided matrix is assumed to already
- * be combined, i.e. projection * view * model.
- *
- * After this operation, this vector's (x, y, z) components will
- * represent the unprojected 3D coordinate.
- * 
- * @param  {Vector4} viewport          screen x, y, width and height in pixels
- * @param  {Matrix4} invProjectionView combined projection and view matrix
- * @return {Vector3}                   this object, for chaining
- */
-vec3.unproject = function(viewport, invProjectionView) {
-    var viewX = viewport.x,
-        viewY = viewport.y,
-        viewWidth = viewport.z,
-        viewHeight = viewport.w;
-    
-    var x = this.x, 
-        y = this.y,
-        z = this.z;
-
-    x = x - viewX;
-    y = viewHeight - y - 1;
-    y = y - viewY;
-
-    this.x = (2 * x) / viewWidth - 1;
-    this.y = (2 * y) / viewHeight - 1;
-    this.z = 2 * z - 1;
-
-    return this.project(invProjectionView);
-};
-
-vec3.random = function(scale) {
-    scale = scale || 1.0;
-
-    var r = Math.random() * 2.0 * Math.PI;
-    var z = (Math.random() * 2.0) - 1.0;
-    var zScale = Math.sqrt(1.0-z*z) * scale;
-    
-    this.x = Math.cos(r) * zScale;
-    this.y = Math.sin(r) * zScale;
-    this.z = z * scale;
-    return this;
-};
-
-vec3.reset = function() {
-    this.x = 0;
-    this.y = 0;
-    this.z = 0;
-    return this;
-};
-
-
-vec3.sub = vec3.subtract;
-
-vec3.mul = vec3.multiply;
-
-vec3.div = vec3.divide;
-
-vec3.dist = vec3.distance;
-
-vec3.distSq = vec3.distanceSq;
-
-vec3.len = vec3.length;
-
-vec3.lenSq = vec3.lengthSq;
-
-vec3.toString = function() {
-    return 'Vector3(' + this.x + ', ' + this.y + ', ' + this.z + ')';
-};
-
-vec3.str = vec3.toString;
-
-module.exports = Vector3;
-},{}],18:[function(require,module,exports){
-var common = require('./common');
-
-function Vector4(x, y, z, w) {
-	if (typeof x === "object") {
-        this.x = x.x||0;
-        this.y = x.y||0;
-        this.z = x.z||0;
-        this.w = x.w||0;
-    } else {
-        this.x = x||0;
-        this.y = y||0;
-        this.z = z||0;
-        this.w = w||0;
-    }
-}
-
-//shorthand it for better minification
-var vec4 = Vector4.prototype;
-
-//mixin common functions
-for (var k in common) {
-    vec4[k] = common[k];
-}
-
-vec4.clone = function() {
-    return new Vector4(this.x, this.y, this.z, this.w);
-};
-
-vec4.multiply = function(v) {
-    this.x *= v.x;
-    this.y *= v.y;
-    this.z *= v.z;
-    this.w *= v.w;
-    return this;
-};
-
-vec4.divide = function(v) {
-    this.x /= v.x;
-    this.y /= v.y;
-    this.z /= v.z;
-    this.w /= v.w;
-    return this;
-};
-
-vec4.distance = function(v) {
-    var dx = v.x - this.x,
-        dy = v.y - this.y,
-        dz = v.z - this.z,
-        dw = v.w - this.w;
-    return Math.sqrt(dx*dx + dy*dy + dz*dz + dw*dw);
-};
-
-vec4.distanceSq = function(v) {
-    var dx = v.x - this.x,
-        dy = v.y - this.y,
-        dz = v.z - this.z,
-        dw = v.w - this.w;
-    return dx*dx + dy*dy + dz*dz + dw*dw;
-};
-
-vec4.negate = function() {
-    this.x = -this.x;
-    this.y = -this.y;
-    this.z = -this.z;
-    this.w = -this.w;
-    return this;
-};
-
-vec4.transformMat4 = function(mat) {
-    var m = mat.val, x = this.x, y = this.y, z = this.z, w = this.w;
-    this.x = m[0] * x + m[4] * y + m[8] * z + m[12] * w;
-    this.y = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
-    this.z = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
-    this.w = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
-    return this;
-};
-
-//// TODO: is this really the same as Vector3 ??
-///  Also, what about this:
-///  http://molecularmusings.wordpress.com/2013/05/24/a-faster-quaternion-vector-multiplication/
-vec4.transformQuat = function(q) {
-    // benchmarks: http://jsperf.com/quaternion-transform-vec3-implementations
-    var x = this.x, y = this.y, z = this.z,
-        qx = q.x, qy = q.y, qz = q.z, qw = q.w,
-
-        // calculate quat * vec
-        ix = qw * x + qy * z - qz * y,
-        iy = qw * y + qz * x - qx * z,
-        iz = qw * z + qx * y - qy * x,
-        iw = -qx * x - qy * y - qz * z;
-
-    // calculate result * inverse quat
-    this.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
-    this.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
-    this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
-    return this;
-};
-
-vec4.random = function(scale) {
-    scale = scale || 1.0;
-
-    //Not spherical; should fix this for more uniform distribution
-    this.x = (Math.random() * 2 - 1) * scale;
-    this.y = (Math.random() * 2 - 1) * scale;
-    this.z = (Math.random() * 2 - 1) * scale;
-    this.w = (Math.random() * 2 - 1) * scale;
-    return this;
-};
-
-vec4.reset = function() {
-    this.x = 0;
-    this.y = 0;
-    this.z = 0;
-    this.w = 0;
-    return this;
-};
-
-vec4.sub = vec4.subtract;
-
-vec4.mul = vec4.multiply;
-
-vec4.div = vec4.divide;
-
-vec4.dist = vec4.distance;
-
-vec4.distSq = vec4.distanceSq;
-
-vec4.len = vec4.length;
-
-vec4.lenSq = vec4.lengthSq;
-
-vec4.toString = function() {
-    return 'Vector4(' + this.x + ', ' + this.y + ', ' + this.z + ', ' + this.w + ')';
-};
-
-vec4.str = vec4.toString;
-
-module.exports = Vector4;
-},{"./common":19}],19:[function(require,module,exports){
-//common vec4 functions
-module.exports = {
-    
-/**
- * Copies the x, y, z, w components from the specified
- * Vector. Unlike most other operations, this function
- * will default undefined components on `otherVec` to zero.
- * 
- * @method  copy
- * @param  {otherVec} the other Vector4 to copy
- * @return {Vector}  this, for chaining
- */
-
-
-/**
- * A convenience function to set the components of
- * this vector as x, y, z, w. Falsy or undefined
- * parameters will default to zero.
- *
- * You can also pass a vector object instead of
- * individual components, to copy the object's components.
- * 
- * @method  set
- * @param {Number} x the x component
- * @param {Number} y the y component
- * @param {Number} z the z component
- * @param {Number} w the w component
- * @return {Vector2}  this, for chaining
- */
-
-/**
- * Adds the components of the other Vector4 to
- * this vector.
- * 
- * @method add
- * @param  {Vector4} otherVec other vector, right operand
- * @return {Vector2}  this, for chaining
- */
-
-/**
- * Subtracts the components of the other Vector4
- * from this vector. Aliased as `sub()`
- * 
- * @method  subtract
- * @param  {Vector4} otherVec other vector, right operand
- * @return {Vector2}  this, for chaining
- */
-
-/**
- * Multiplies the components of this Vector4
- * by a scalar amount.
- *
- * @method  scale
- * @param {Number} s the scale to multiply by
- * @return {Vector4} this, for chaining
- */
-
-/**
- * Returns the magnitude (length) of this vector.
- *
- * Aliased as `len()`
- * 
- * @method  length
- * @return {Number} the length of this vector
- */
-
-/**
- * Returns the squared magnitude (length) of this vector.
- *
- * Aliased as `lenSq()`
- * 
- * @method  lengthSq
- * @return {Number} the squared length of this vector
- */
-
-/**
- * Normalizes this vector to a unit vector.
- * @method normalize
- * @return {Vector4}  this, for chaining
- */
-
-/**
- * Returns the dot product of this vector
- * and the specified Vector4.
- * 
- * @method dot
- * @return {Number} the dot product
- */
-    copy: function(otherVec) {
-        this.x = otherVec.x||0;
-        this.y = otherVec.y||0;
-        this.z = otherVec.z||0;
-        this.w = otherVec.w||0;
-        return this;
-    },
-
-    set: function(x, y, z, w) {
-        if (typeof x === "object") {
-            this.x = x.x||0;
-            this.y = x.y||0;
-            this.z = x.z||0;
-            this.w = x.w||0;
-        } else {
-            this.x = x||0;
-            this.y = y||0;
-            this.z = z||0;
-            this.w = w||0;
-
-        }
-        return this;
-    },
-
-    add: function(v) {
-        this.x += v.x;
-        this.y += v.y;
-        this.z += v.z;
-        this.w += v.w;
-        return this;
-    },
-
-    subtract: function(v) {
-        this.x -= v.x;
-        this.y -= v.y;
-        this.z -= v.z;
-        this.w -= v.w;
-        return this;
-    },
-
-    scale: function(s) {
-        this.x *= s;
-        this.y *= s;
-        this.z *= s;
-        this.w *= s;
-        return this;
-    },
-
-
-    length: function() {
-        var x = this.x,
-            y = this.y,
-            z = this.z,
-            w = this.w;
-        return Math.sqrt(x*x + y*y + z*z + w*w);
-    },
-
-    lengthSq: function() {
-        var x = this.x,
-            y = this.y,
-            z = this.z,
-            w = this.w;
-        return x*x + y*y + z*z + w*w;
-    },
-
-    normalize: function() {
-        var x = this.x,
-            y = this.y,
-            z = this.z,
-            w = this.w;
-        var len = x*x + y*y + z*z + w*w;
-        if (len > 0) {
-            len = 1 / Math.sqrt(len);
-            this.x = x*len;
-            this.y = y*len;
-            this.z = z*len;
-            this.w = w*len;
-        }
-        return this;
-    },
-
-    dot: function(v) {
-        return this.x * v.x + this.y * v.y + this.z * v.z + this.w * v.w;
-    },
-
-    lerp: function(v, t) {
-        var ax = this.x,
-            ay = this.y,
-            az = this.z,
-            aw = this.w;
-        t = t||0;
-        this.x = ax + t * (v.x - ax);
-        this.y = ay + t * (v.y - ay);
-        this.z = az + t * (v.z - az);
-        this.w = aw + t * (v.w - aw);
-        return this;
-    }
-};
-},{}],20:[function(require,module,exports){
-module.exports = {
-    Vector2: require('./Vector2'),
-    Vector3: require('./Vector3'),
-    Vector4: require('./Vector4'),
-    Matrix3: require('./Matrix3'),
-    Matrix4: require('./Matrix4'),
-    Quaternion: require('./Quaternion')
-};
-},{"./Matrix3":13,"./Matrix4":14,"./Quaternion":15,"./Vector2":16,"./Vector3":17,"./Vector4":18}],21:[function(require,module,exports){
 module.exports = {"size":32,"resolution":72,"underline_thickness":56,"underline_position":-115,"max_advance_width":1004,"height":1361,"descender":-345,"ascender":1016,"units_per_EM":1000,"style_name":"Regular","family_name":"Alegreya","kerning":[],"glyphs":{"0":{"xoff":1088,"width":960,"height":1024,"hbx":64,"hby":1024,"path":[["m",518,0],["c",804,0,1013,233,1013,543],["c",1013,822,833,1024,575,1024],["c",288,1024,77,793,77,489],["c",77,200,253,0,518,0],["m",554,155],["c",339,155,192,303,192,518],["c",192,723,327,858,532,858],["c",747,858,899,705,899,489],["c",899,290,759,155,554,155]]},"1":{"xoff":704,"width":640,"height":1088,"hbx":64,"hby":1024,"path":[["m",448,823],["c",454,914,471,946,524,990],["l",511,1024],["c",507,1024,507,1019,305,988],["c",200,972,79,958,79,958],["l",71,875],["l",77,869],["c",77,869,143,881,186,881],["c",255,881,296,869,296,768],["l",296,316],["c",296,142,264,102,112,91],["l",100,0],["c",100,-25,253,0,358,0],["c",458,0,630,-7,630,-7],["l",649,88],["l",645,96],["c",645,96,585,90,536,90],["c",456,90,436,120,436,227],["c",436,331,440,604,448,819],["l",448,823]]},"2":{"xoff":960,"width":960,"height":1088,"hbx":0,"hby":1024,"path":[["m",75,0],["l",186,0],["c",362,0,843,-15,843,-15],["l",868,0],["c",884,149,927,318,927,318],["l",845,308],["c",804,155,765,124,616,124],["l",303,124],["l",294,139],["c",628,510,731,658,731,779],["c",731,925,620,1024,450,1024],["c",319,1024,172,927,104,797],["l",126,706],["l",145,706],["c",206,815,305,886,397,886],["c",493,886,550,830,550,733],["c",550,619,446,448,217,191],["l",55,12],["l",75,0]]},"3":{"xoff":832,"width":768,"height":1216,"hbx":0,"hby":1024,"path":[["m",40,-43],["c",43,-149,79,-192,172,-192],["c",434,-192,731,52,731,261],["c",731,382,638,465,454,507],["l",454,517],["c",591,584,679,693,679,798],["c",679,933,573,1024,413,1024],["c",262,1024,75,877,75,877],["l",96,794],["l",116,794],["c",178,853,272,894,350,894],["c",440,894,509,839,509,756],["c",509,669,432,574,323,525],["l",190,493],["l",200,424],["l",210,414],["c",460,412,577,349,577,214],["c",577,64,419,-49,215,-49],["c",163,-49,108,-43,51,-31],["l",40,-43]]},"4":{"xoff":896,"width":896,"height":1280,"hbx":0,"hby":1088,"path":[["m",8,192],["c",167,192,356,188,514,184],["c",511,29,501,-175,501,-175],["l",514,-192],["l",659,-169],["l",669,-155],["c",669,-155,657,19,655,180],["c",765,176,841,174,841,174],["l",858,286],["l",845,302],["l",655,302],["l",655,1004],["l",589,1024],["c",587,1026,583,1024,581,1024],["l",16,267],["l",8,192],["m",495,750],["l",514,750],["l",514,302],["l",165,302],["l",495,750]]},"5":{"xoff":896,"width":832,"height":1280,"hbx":0,"hby":1088,"path":[["m",745,283],["c",745,477,528,562,253,625],["l",268,882],["c",505,882,716,866,716,866],["l",729,878],["l",778,1088],["l",710,1082],["c",688,1041,661,1032,581,1029],["l",194,1015],["l",178,999],["c",178,999,163,742,143,501],["l",161,479],["c",485,424,589,354,589,222],["c",589,61,423,-49,208,-49],["c",155,-49,100,-43,43,-31],["l",32,-43],["c",38,-164,83,-192,161,-192],["c",407,-192,745,34,745,283]]},"6":{"xoff":960,"width":832,"height":1216,"hbx":64,"hby":1216,"path":[["m",798,1145],["l",776,1205],["l",761,1216],["c",761,1216,81,1014,81,411],["c",81,182,223,0,450,0],["c",692,0,858,174,858,378],["c",858,526,739,704,503,704],["c",442,704,276,597,276,597],["l",268,601],["c",374,996,798,1145,798,1145],["m",458,583],["c",604,583,706,462,706,331],["c",706,185,622,98,491,98],["c",337,98,245,226,245,423],["c",245,452,247,481,251,511],["c",282,532,368,583,458,583]]},"7":{"xoff":832,"width":832,"height":1216,"hbx":64,"hby":1024,"path":[["m",346,-192],["l",397,-18],["c",477,163,620,494,856,966],["l",810,1024],["l",378,1024],["c",251,1015,129,1024,129,1024],["l",116,1013],["c",106,860,77,664,77,664],["l",157,676],["c",184,819,206,858,346,864],["l",700,878],["l",188,-112],["l",208,-156],["l",331,-192],["l",346,-192]]},"8":{"xoff":1024,"width":832,"height":1216,"hbx":64,"hby":1216,"path":[["m",114,272],["c",114,97,280,0,464,0],["c",702,0,882,161,882,355],["c",882,508,765,592,636,659],["c",720,703,839,794,839,947],["c",839,1125,677,1216,520,1216],["c",303,1216,151,1056,151,889],["c",151,742,258,663,378,600],["c",286,558,114,459,114,272],["m",514,88],["c",368,88,264,199,264,320],["c",264,469,382,536,450,564],["c",595,494,741,433,741,298],["c",741,177,634,88,514,88],["m",294,949],["c",294,1038,368,1121,485,1121],["c",597,1121,686,1046,686,905],["c",686,788,618,727,563,695],["c",425,764,294,826,294,949]]},"9":{"xoff":960,"width":832,"height":1216,"hbx":64,"hby":1024,"path":[["m",133,-122],["l",155,-182],["l",169,-192],["c",169,-192,849,9,849,612],["c",849,841,708,1024,481,1024],["c",239,1024,73,849,73,645],["c",73,497,192,320,428,320],["c",489,320,655,426,655,426],["l",661,420],["c",557,25,133,-122,133,-122],["m",473,440],["c",323,440,225,557,225,692],["c",225,838,309,925,440,925],["c",591,925,686,795,686,600],["c",686,569,683,540,679,512],["c",647,491,563,440,473,440]]}," ":{"xoff":384,"width":0,"height":0,"hbx":0,"hby":0,"path":[]},"!":{"xoff":576,"width":384,"height":1472,"hbx":64,"hby":1472,"path":[["m",239,0],["c",319,0,368,57,368,126],["c",368,190,327,243,251,243],["c",174,243,124,186,124,116],["c",124,57,161,0,239,0],["m",217,459],["l",239,442],["l",296,457],["l",403,1449],["l",384,1472],["l",215,1434],["l",200,1413],["l",217,459]]},"\"":{"xoff":640,"width":512,"height":448,"hbx":64,"hby":1280,"path":[["m",264,1280],["l",120,1253],["c",120,1253,141,1046,133,835],["l",155,832],["l",206,858],["c",249,1054,278,1264,278,1264],["l",264,1280],["m",514,1280],["l",370,1253],["c",370,1253,391,1046,382,835],["l",405,832],["l",456,858],["c",499,1054,528,1264,528,1264],["l",514,1280]]},"#":{"xoff":1024,"width":1024,"height":1088,"hbx":0,"hby":1152,"path":[["m",104,741],["l",327,743],["l",303,633],["l",276,512],["l",53,514],["l",22,438],["l",28,417],["l",255,419],["l",180,76],["l",194,64],["l",274,80],["l",350,419],["l",423,421],["l",567,419],["l",491,76],["l",505,64],["l",585,80],["l",659,417],["l",868,415],["l",907,489],["l",899,507],["l",679,507],["l",712,658],["l",731,741],["l",944,739],["l",982,813],["l",974,832],["l",753,832],["l",833,1140],["l",817,1152],["l",735,1142],["l",659,832],["l",550,833],["l",442,833],["l",522,1140],["l",505,1152],["l",423,1142],["l",348,835],["l",129,837],["l",98,762],["l",104,741],["m",401,658],["l",421,743],["l",499,745],["l",638,743],["l",614,633],["l",587,507],["l",475,509],["l",368,509],["l",401,658]]},"$":{"xoff":960,"width":768,"height":1664,"hbx":64,"hby":1344,"path":[["m",577,1325],["l",565,1344],["l",511,1335],["l",483,1024],["c",276,1007,126,886,126,730],["c",126,591,264,520,399,457],["c",407,451,417,447,428,443],["l",393,98],["c",255,106,223,159,223,349],["l",131,341],["c",131,199,108,73,108,73],["l",118,55],["c",118,55,225,2,384,0],["l",358,-305],["l",368,-320],["l",421,-314],["l",448,2],["c",669,20,819,141,819,305],["c",819,451,655,522,511,588],["c",509,588,507,588,505,589],["l",538,917],["c",638,907,673,868,673,781],["c",673,740,669,710,669,710],["l",681,702],["l",761,710],["c",772,850,800,972,800,972],["l",792,987],["c",792,987,692,1021,548,1026],["l",577,1325],["m",651,250],["c",651,163,573,106,458,98],["l",489,414],["c",579,370,651,323,651,250],["m",284,783],["c",284,860,364,915,473,919],["l",444,619],["c",354,665,284,712,284,783]]},"%":{"xoff":1344,"width":1344,"height":1536,"hbx":64,"hby":1344,"path":[["m",376,771],["c",278,771,167,829,167,976],["c",167,1075,235,1144,346,1144],["c",481,1144,559,1053,559,939],["c",559,800,450,771,376,771],["m",348,640],["c",544,640,655,807,655,984],["c",655,1125,571,1280,380,1280],["c",198,1280,71,1133,71,949],["c",71,774,174,640,348,640],["m",1071,131],["c",972,131,862,180,862,305],["c",862,388,929,448,1040,448],["c",1175,448,1253,370,1253,273],["c",1253,155,1144,131,1071,131],["m",1042,0],["c",1238,0,1349,162,1349,311],["c",1349,431,1265,583,1075,583],["c",892,583,765,438,765,282],["c",765,134,868,0,1042,0],["m",1202,1302],["l",1122,1344],["l",597,509],["c",415,267,147,-121,147,-121],["l",157,-149],["l",235,-192],["c",235,-192,491,209,675,448],["c",856,762,1212,1271,1212,1271],["l",1202,1302]]},"&":{"xoff":1408,"width":1408,"height":1344,"hbx":64,"hby":1280,"path":[["m",667,591],["c",425,784,358,877,358,1008],["c",358,1099,428,1159,538,1159],["c",616,1159,659,1137,755,1052],["l",776,1054],["l",874,1202],["l",870,1232],["c",870,1232,772,1280,622,1280],["c",391,1280,215,1141,215,960],["c",215,865,268,764,382,650],["l",382,637],["c",382,637,112,543,112,330],["c",112,134,282,0,550,0],["c",690,0,843,69,958,178],["c",1118,6,1206,-64,1218,-64],["c",1249,-64,1345,-3,1345,-3],["l",1345,28],["l",1058,260],["c",1111,339,1140,425,1140,508],["c",1140,585,1107,656,1054,701],["l",1060,713],["l",1265,713],["c",1372,713,1390,719,1408,754],["l",1435,817],["l",1415,865],["c",1410,857,1396,855,1257,843],["l",835,819],["c",769,815,726,782,726,782],["l",755,695],["c",755,695,817,713,872,713],["c",980,713,1032,638,1032,481],["c",1032,416,1019,359,995,311],["l",667,591],["m",903,191],["c",825,162,720,129,608,129],["c",401,129,266,223,266,367],["c",266,461,335,550,442,594],["l",903,191]]},"'":{"xoff":384,"width":256,"height":448,"hbx":64,"hby":1280,"path":[["m",264,1280],["l",120,1253],["c",120,1253,141,1046,133,835],["l",155,832],["l",206,858],["c",249,1054,278,1264,278,1264],["l",264,1280]]},"(":{"xoff":640,"width":512,"height":1600,"hbx":128,"hby":1280,"path":[["m",172,301],["c",172,-186,550,-320,550,-320],["l",559,-320],["l",602,-268],["l",602,-258],["c",602,-258,309,-117,309,332],["l",309,680],["c",309,1096,589,1213,589,1213],["l",591,1221],["l",565,1280],["l",557,1280],["c",557,1280,172,1143,172,650],["l",172,301]]},")":{"xoff":640,"width":512,"height":1600,"hbx":0,"hby":1280,"path":[["m",460,658],["c",460,1145,81,1280,81,1280],["l",73,1280],["l",30,1227],["l",30,1217],["c",30,1217,323,1076,323,627],["l",323,279],["c",323,-137,43,-254,43,-254],["l",40,-262],["l",67,-320],["l",75,-320],["c",75,-320,460,-184,460,309],["l",460,658]]},"*":{"xoff":960,"width":704,"height":640,"hbx":128,"hby":1472,"path":[["m",176,1330],["l",157,1322],["c",139,1262,139,1186,139,1186],["c",139,1186,251,1162,356,1128],["l",368,1138],["l",380,1204],["c",288,1272,176,1330,176,1330],["m",186,944],["l",188,926],["c",241,890,315,866,315,866],["c",315,866,372,964,438,1050],["l",432,1064],["l",372,1096],["c",276,1032,186,944,186,944],["m",565,834],["l",583,832],["c",634,870,679,930,679,930],["c",679,930,604,1014,540,1102],["l",524,1100],["l",475,1054],["c",507,946,565,834,565,834],["m",788,1152],["l",796,1170],["c",776,1228,731,1290,731,1290],["c",731,1290,626,1244,520,1212],["l",518,1196],["l",546,1138],["c",661,1134,788,1152,788,1152],["m",548,1458],["l",534,1472],["c",471,1472,397,1448,397,1448],["c",397,1448,407,1336,407,1228],["l",419,1220],["l",489,1230],["c",526,1336,548,1458,548,1458]]},"+":{"xoff":1024,"width":1024,"height":960,"hbx":0,"hby":1024,"path":[["m",561,1024],["l",456,1006],["l",454,576],["c",276,576,59,578,59,578],["l",36,477],["l",49,459],["c",49,459,274,461,454,461],["c",454,290,452,75,452,75],["l",471,64],["l",571,85],["c",571,85,569,290,569,461],["l",982,463],["l",999,567],["l",987,588],["c",987,588,733,576,569,576],["c",569,747,581,1011,581,1011],["l",561,1024]]},",":{"xoff":512,"width":384,"height":512,"hbx":0,"hby":192,"path":[["m",126,112],["c",161,80,192,28,192,-28],["c",192,-114,122,-208,30,-270],["l",30,-290],["l",67,-320],["c",190,-250,354,-118,354,36],["c",354,138,307,192,249,192],["c",204,192,157,160,131,140],["l",126,112]]},"-":{"xoff":640,"width":576,"height":192,"hbx":64,"hby":640,"path":[["m",575,640],["c",575,640,536,631,442,620],["l",86,577],["l",73,465],["l",88,448],["l",579,504],["l",589,620],["l",575,640]]},".":{"xoff":512,"width":320,"height":256,"hbx":64,"hby":256,"path":[["m",237,0],["c",317,0,366,57,366,126],["c",366,190,325,243,249,243],["c",172,243,122,186,122,116],["c",122,57,159,0,237,0]]},"/":{"xoff":704,"width":576,"height":1664,"hbx":64,"hby":1408,"path":[["m",587,1408],["l",493,1408],["l",258,456],["c",178,134,69,-240,69,-240],["l",83,-256],["l",182,-256],["c",182,-256,268,83,354,433],["c",442,776,604,1387,604,1387],["l",587,1408]]},":":{"xoff":512,"width":320,"height":832,"hbx":64,"hby":832,"path":[["m",229,0],["c",309,0,358,57,358,126],["c",358,190,317,243,241,243],["c",163,243,114,186,114,116],["c",114,57,151,0,229,0],["m",229,576],["c",309,576,358,633,358,702],["c",358,766,317,819,241,819],["c",163,819,114,762,114,692],["c",114,633,151,576,229,576]]},";":{"xoff":512,"width":384,"height":1088,"hbx":0,"hby":768,"path":[["m",126,112],["c",161,80,192,28,192,-28],["c",192,-114,122,-208,30,-270],["l",30,-290],["l",67,-320],["c",190,-250,354,-118,354,36],["c",354,138,307,192,249,192],["c",204,192,157,160,131,140],["l",126,112],["m",229,538],["c",309,538,358,595,358,665],["c",358,714,317,768,241,768],["c",163,768,114,710,114,641],["c",114,581,151,524,229,524],["l",229,538]]},"<":{"xoff":1024,"width":960,"height":768,"hbx":0,"hby":896,"path":[["m",79,457],["c",79,457,335,356,485,293],["c",653,225,870,128,870,128],["l",931,205],["l",929,227],["c",929,227,726,311,559,381],["l",215,517],["l",215,529],["l",530,646],["c",698,712,927,788,927,788],["l",913,886],["l",894,896],["c",894,896,669,814,483,738],["l",67,570],["l",63,478],["l",79,457]]},"=":{"xoff":1024,"width":1024,"height":512,"hbx":0,"hby":768,"path":[["m",987,446],["c",987,446,712,434,548,434],["c",366,434,59,436,59,436],["l",36,336],["l",49,320],["c",49,317,333,320,518,320],["l",982,322],["l",999,426],["l",987,446],["m",987,768],["c",987,766,712,754,548,754],["c",366,754,59,756,59,756],["l",36,656],["l",49,638],["c",49,638,333,640,518,640],["l",982,642],["l",999,746],["l",987,768]]},">":{"xoff":1024,"width":960,"height":768,"hbx":64,"hby":896,"path":[["m",956,566],["c",956,566,700,667,550,730],["c",382,798,165,896,165,896],["l",104,818],["l",106,796],["c",106,796,309,712,477,642],["l",821,506],["l",821,494],["l",505,377],["c",337,311,108,235,108,235],["l",122,137],["l",141,128],["c",141,128,366,209,552,285],["l",968,453],["l",972,545],["l",956,566]]},"?":{"xoff":768,"width":640,"height":1472,"hbx":64,"hby":1472,"path":[["m",221,445],["l",239,436],["l",364,472],["l",370,489],["l",327,688],["l",333,707],["c",487,820,673,894,673,1129],["c",673,1320,466,1463,215,1472],["l",186,1463],["l",118,1355],["l",122,1332],["c",370,1318,538,1236,538,1066],["c",538,988,485,929,421,885],["l",178,726],["l",172,696],["l",221,445],["m",292,0],["c",372,0,421,57,421,126],["c",421,190,380,243,305,243],["c",227,243,178,186,178,116],["c",178,57,215,0,292,0]]},"@":{"xoff":1728,"width":1600,"height":1664,"hbx":64,"hby":1216,"path":[["m",976,0],["c",1410,0,1636,297,1636,597],["c",1636,929,1353,1202,942,1202],["c",407,1202,67,785,67,382],["c",67,-17,348,-384,882,-409],["l",935,-335],["l",935,-320],["c",430,-291,212,51,212,416],["c",212,763,475,1088,890,1088],["c",1253,1088,1494,887,1494,552],["c",1494,305,1349,135,1050,135],["l",1042,142],["c",1095,486,1214,861,1214,861],["l",1197,885],["l",1134,915],["l",1124,913],["l",1105,863],["l",901,896],["c",681,896,432,578,432,264],["c",432,114,485,0,595,0],["c",720,88,843,223,978,454],["l",991,451],["c",991,451,903,98,903,59],["c",903,20,927,0,976,0],["m",634,162],["c",600,162,575,253,575,355],["c",575,582,708,785,837,785],["c",921,785,1017,739,1044,724],["c",886,395,706,162,634,162]]},"A":{"xoff":1216,"width":1280,"height":1344,"hbx":-64,"hby":1280,"path":[["m",1009,218],["c",856,661,683,1280,683,1280],["l",667,1280],["l",538,1246],["l",139,233],["c",94,125,55,92,-21,84],["l",-37,-7],["c",-37,-7,90,0,188,0],["c",323,0,473,-15,473,-15],["l",485,69],["l",481,77],["l",364,77],["c",278,77,241,100,241,156],["c",241,173,247,196,260,231],["l",335,432],["c",382,438,479,448,559,448],["c",616,448,722,448,772,445],["l",839,235],["c",851,198,858,167,858,142],["c",858,96,817,79,675,69],["l",667,-7],["l",673,0],["c",673,-21,821,0,978,0],["c",1048,0,1195,-7,1195,-7],["l",1210,73],["l",1206,81],["c",1087,90,1042,121,1009,218],["m",567,1063],["l",581,1063],["l",743,541],["c",696,537,608,531,552,531],["l",372,531],["l",567,1063]]},"B":{"xoff":1216,"width":1088,"height":1408,"hbx":64,"hby":1344,"path":[["m",352,0],["c",456,20,538,0,628,0],["c",886,0,1109,180,1109,389],["c",1109,538,991,653,792,695],["c",944,759,1030,872,1030,1004],["c",1030,1201,886,1312,626,1312],["c",626,1288,460,1280,384,1280],["c",307,1280,157,1286,157,1286],["l",143,1218],["l",147,1212],["c",147,1212,192,1216,217,1216],["c",278,1216,292,1194,292,1107],["l",290,264],["c",290,152,258,116,131,92],["l",118,0],["c",118,-25,249,0,352,0],["m",657,614],["c",839,581,933,485,933,337],["c",933,200,833,104,669,104],["c",499,104,436,142,436,245],["l",444,620],["l",657,614],["m",448,727],["c",452,894,458,1047,466,1177],["c",468,1213,475,1224,503,1224],["c",749,1224,864,1143,864,970],["c",864,755,671,711,671,711],["c",640,711,448,727,448,727]]},"C":{"xoff":1280,"width":1152,"height":1280,"hbx":64,"hby":1280,"path":[["m",694,0],["c",937,0,1114,81,1114,81],["l",1126,100],["c",1140,238,1181,412,1181,412],["l",1083,404],["c",1032,198,921,102,735,102],["c",452,102,266,324,266,661],["c",266,965,442,1159,716,1159],["c",917,1159,1017,1099,1017,980],["c",1017,938,1011,887,1011,887],["l",1109,894],["c",1122,1070,1161,1218,1161,1218],["l",1152,1230],["c",1152,1230,966,1280,796,1280],["c",382,1280,81,986,81,598],["c",81,236,321,0,694,0]]},"D":{"xoff":1472,"width":1344,"height":1408,"hbx":64,"hby":1344,"path":[["m",649,0],["c",1046,0,1357,306,1357,693],["c",1357,1039,1083,1280,683,1280],["c",683,1288,466,1280,372,1280],["c",294,1280,157,1286,157,1286],["l",143,1218],["l",147,1179],["c",147,1212,192,1216,217,1216],["c",278,1216,292,1194,292,1107],["l",290,266],["c",290,154,258,118,131,94],["l",118,0],["c",118,-25,251,0,354,0],["c",458,24,649,0,649,0],["m",542,1179],["c",946,1179,1171,989,1171,646],["c",1171,310,991,104,696,104],["c",489,104,438,141,438,283],["c",438,370,450,687,468,1136],["c",471,1171,485,1179,542,1179]]},"E":{"xoff":1216,"width":1088,"height":1408,"hbx":64,"hby":1344,"path":[["m",436,210],["c",436,275,438,374,444,587],["c",479,593,540,601,602,601],["c",712,601,888,595,888,595],["l",917,716],["l",909,726],["c",909,726,733,704,659,704],["c",597,704,493,706,448,706],["l",464,1098],["c",466,1173,475,1177,608,1177],["c",896,1177,921,1165,921,1033],["c",921,1005,917,946,917,946],["l",1015,955],["c",1028,1141,1062,1292,1062,1292],["l",1056,1280],["c",921,1286,767,1280,442,1280],["c",319,1280,157,1286,157,1286],["l",143,1196],["l",147,1187],["c",147,1211,192,1216,217,1216],["c",278,1216,292,1192,292,1101],["l",290,249],["c",290,140,253,103,131,88],["l",118,0],["c",118,-21,247,0,403,0],["c",597,0,1023,-15,1023,-15],["l",1034,-3],["c",1052,169,1089,333,1089,333],["l",1083,342],["l",993,333],["c",960,115,921,92,597,92],["c",450,92,436,104,436,210]]},"F":{"xoff":1024,"width":960,"height":1408,"hbx":64,"hby":1344,"path":[["m",436,227],["l",444,561],["c",479,568,540,576,602,576],["c",698,576,853,570,853,570],["l",882,692],["l",874,702],["c",874,702,722,680,659,680],["l",448,682],["l",464,1100],["c",466,1173,475,1177,608,1177],["c",858,1177,882,1165,882,1036],["c",882,1009,878,945,878,945],["l",976,953],["c",989,1135,1023,1292,1023,1292],["l",1017,1280],["c",888,1286,722,1280,442,1280],["c",319,1280,157,1286,157,1286],["l",143,1196],["l",147,1187],["c",147,1211,192,1216,217,1216],["c",278,1216,292,1193,292,1103],["l",290,256],["c",290,147,258,112,131,89],["l",118,0],["c",118,-25,249,0,352,0],["c",462,0,657,-9,657,-9],["l",675,88],["l",671,96],["c",671,96,567,90,526,90],["c",454,90,436,118,436,227]]},"G":{"xoff":1344,"width":1152,"height":1280,"hbx":64,"hby":1280,"path":[["m",1204,623],["c",1204,623,1116,614,1028,614],["c",907,614,767,621,767,621],["l",749,520],["l",753,512],["l",894,512],["c",987,512,1007,494,1007,408],["l",1007,175],["c",1007,175,890,102,726,102],["c",444,102,260,322,260,665],["c",260,979,442,1159,753,1159],["c",970,1159,1062,1109,1062,992],["c",1062,941,1056,890,1056,890],["l",1152,898],["c",1165,1072,1206,1218,1206,1218],["l",1197,1230],["c",1197,1230,970,1280,800,1280],["c",372,1280,81,1000,81,604],["c",81,236,315,0,679,0],["c",939,0,1150,94,1150,94],["l",1163,111],["c",1154,144,1148,213,1148,280],["c",1148,469,1163,538,1212,579],["l",1204,623]]},"H":{"xoff":1536,"width":1408,"height":1408,"hbx":64,"hby":1344,"path":[["m",1269,1082],["c",1273,1156,1298,1179,1400,1192],["l",1408,1280],["c",1408,1298,1261,1280,1163,1280],["c",1097,1280,962,1284,962,1286],["l",948,1196],["l",952,1187],["c",952,1187,997,1191,1021,1191],["c",1083,1191,1097,1170,1097,1084],["l",1095,723],["c",974,709,894,704,792,704],["l",448,705],["l",460,1027],["c",466,1166,477,1187,595,1206],["l",604,1280],["c",604,1298,473,1280,384,1280],["c",307,1280,157,1286,157,1286],["l",143,1196],["l",147,1187],["c",147,1187,192,1191,217,1191],["c",278,1191,292,1170,292,1084],["l",290,256],["c",290,147,258,112,131,89],["l",118,0],["c",122,-15,311,0,430,0],["c",501,0,604,-5,604,-7],["l",622,88],["l",618,96],["c",618,96,567,90,526,90],["c",454,90,436,118,436,227],["l",444,587],["c",444,587,718,609,784,609],["c",878,609,1095,607,1095,607],["l",1095,303],["c",1095,126,1068,90,939,88],["l",921,-5],["c",921,-5,1085,0,1157,0],["c",1247,0,1408,-7,1408,-7],["l",1427,88],["l",1423,96],["c",1423,96,1372,90,1331,90],["c",1259,90,1240,118,1240,227],["c",1240,394,1255,803,1269,1092],["l",1269,1082]]},"I":{"xoff":768,"width":576,"height":1408,"hbx":64,"hby":1344,"path":[["m",464,1078],["c",468,1153,497,1177,612,1191],["l",620,1280],["c",620,1298,479,1280,384,1280],["c",301,1280,141,1286,141,1286],["l",126,1196],["l",131,1187],["c",131,1187,186,1191,217,1191],["c",278,1191,292,1168,292,1085],["l",290,259],["c",290,149,255,114,126,90],["l",114,0],["c",114,-25,247,0,352,0],["c",448,0,620,-7,620,-7],["l",638,88],["l",634,96],["c",634,96,575,90,526,90],["c",454,90,436,118,436,226],["c",436,392,450,801,464,1091],["l",464,1078]]},"J":{"xoff":640,"width":576,"height":1664,"hbx":0,"hby":1344,"path":[["m",268,204],["c",268,-39,219,-138,53,-237],["l",47,-254],["l",81,-320],["c",313,-227,413,-69,415,206],["c",417,372,434,893,442,1073],["c",446,1158,462,1174,559,1188],["l",567,1280],["c",567,1298,417,1280,329,1280],["l",108,1280],["l",94,1189],["l",98,1181],["c",98,1181,169,1189,194,1189],["c",255,1189,270,1169,270,1081],["l",268,204]]},"K":{"xoff":1280,"width":1216,"height":1408,"hbx":64,"hby":1344,"path":[["m",290,240],["c",290,127,264,101,137,90],["l",116,-3],["c",116,-3,249,0,352,0],["c",442,0,604,-7,604,-7],["l",622,88],["l",618,96],["c",618,96,567,90,526,90],["c",454,90,432,117,436,224],["l",460,1072],["c",462,1147,493,1175,595,1191],["l",604,1280],["c",604,1298,473,1280,384,1280],["c",307,1280,157,1286,157,1286],["l",143,1196],["l",147,1187],["c",147,1187,192,1191,217,1191],["c",278,1191,292,1170,292,1085],["l",290,240],["m",495,644],["l",853,168],["c",933,62,1015,0,1083,0],["c",1105,0,1253,23,1253,23],["l",1265,90],["l",1257,97],["c",1161,97,1093,143,995,264],["l",651,693],["l",980,1025],["c",1103,1146,1144,1175,1216,1189],["l",1230,1273],["l",1222,1288],["c",1222,1288,1114,1280,1034,1280],["c",958,1280,808,1294,808,1294],["l",794,1206],["l",798,1198],["c",886,1191,927,1172,927,1138],["c",927,1111,907,1077,864,1036],["l",497,672],["l",495,644]]},"L":{"xoff":1024,"width":960,"height":1408,"hbx":128,"hby":1344,"path":[["m",413,0],["c",608,0,964,-19,964,-19],["l",974,-7],["c",997,194,1034,376,1034,376],["l",1028,386],["l",937,376],["c",892,130,849,92,612,92],["c",458,92,438,110,438,246],["c",438,424,444,760,462,1007],["c",473,1139,460,1173,597,1191],["l",606,1280],["c",606,1298,475,1280,387,1280],["c",309,1280,157,1286,157,1286],["l",143,1196],["l",147,1188],["c",147,1188,192,1191,217,1191],["c",278,1191,292,1170,292,1085],["l",290,256],["c",290,144,258,106,151,90],["l",139,0],["c",139,-21,260,0,413,0]]},"M":{"xoff":1728,"width":1600,"height":1408,"hbx":64,"hby":1344,"path":[["m",862,-25],["l",1257,1035],["l",1267,1035],["c",1267,1035,1337,245,1337,177],["c",1337,117,1300,88,1216,77],["l",1208,-17],["c",1208,-17,1333,0,1421,0],["c",1494,0,1615,-7,1615,-7],["l",1634,86],["l",1630,94],["c",1630,94,1597,90,1572,90],["c",1507,90,1490,123,1472,278],["c",1449,556,1419,1031,1419,1089],["c",1419,1154,1462,1184,1580,1198],["l",1591,1271],["l",1587,1280],["c",1587,1292,1427,1280,1365,1280],["c",1324,1280,1230,1286,1230,1284],["c",1036,708,876,292,876,292],["l",866,292],["c",866,292,704,704,520,1288],["c",520,1288,440,1280,380,1280],["c",315,1280,157,1290,157,1290],["l",141,1219],["l",147,1209],["c",272,1201,325,1169,325,1099],["c",325,1039,251,379,235,232],["c",223,124,190,88,104,77],["l",94,-17],["c",94,-17,188,0,270,0],["c",337,0,468,-9,468,-9],["l",487,83],["l",483,92],["c",483,92,419,90,399,90],["c",356,90,335,110,335,152],["c",335,204,405,1045,405,1045],["l",415,1045],["l",812,-64],["l",862,-25]]},"N":{"xoff":1472,"width":1344,"height":1408,"hbx":64,"hby":1344,"path":[["m",1128,292],["c",1128,292,780,769,440,1288],["c",440,1288,370,1280,303,1280],["c",245,1280,126,1290,126,1290],["l",110,1214],["l",116,1204],["c",253,1189,294,1161,294,1079],["l",268,204],["c",266,122,225,88,141,77],["l",131,-13],["c",131,-13,239,0,321,0],["c",409,0,538,-7,538,-7],["l",557,83],["l",552,92],["c",552,92,468,90,448,90],["c",401,90,384,110,384,170],["l",395,1025],["l",405,1025],["c",405,1025,767,530,1167,-64],["l",1226,-42],["l",1255,1075],["c",1257,1153,1300,1189,1394,1202],["l",1404,1280],["c",1404,1296,1288,1280,1202,1280],["c",1132,1280,1007,1288,1007,1288],["l",989,1196],["l",993,1187],["c",993,1187,1034,1189,1071,1189],["c",1116,1189,1138,1161,1138,1103],["l",1138,292],["l",1128,292]]},"O":{"xoff":1408,"width":1280,"height":1280,"hbx":64,"hby":1280,"path":[["m",712,104],["c",444,104,258,332,258,659],["c",258,954,432,1157,686,1157],["c",962,1157,1152,929,1152,602],["c",1152,307,972,104,712,104],["m",649,0],["c",1036,0,1335,301,1335,682],["c",1335,1030,1097,1280,755,1280],["c",376,1280,81,977,81,598],["c",81,247,313,0,649,0]]},"P":{"xoff":1152,"width":960,"height":1408,"hbx":128,"hby":1344,"path":[["m",143,1187],["l",147,1179],["c",147,1211,192,1216,217,1216],["c",276,1216,292,1193,292,1106],["l",290,258],["c",290,143,262,113,143,92],["l",129,0],["c",133,-11,323,0,434,0],["c",503,0,622,-5,622,-7],["l",640,88],["l",636,96],["c",636,96,567,90,526,90],["c",446,90,436,111,436,292],["l",440,487],["l",612,487],["c",856,487,1081,696,1081,923],["c",1081,1151,925,1280,643,1280],["c",643,1288,440,1280,384,1280],["c",307,1280,157,1286,157,1286],["l",143,1187],["m",444,620],["c",448,796,456,1000,468,1183],["c",471,1179,475,1179,524,1179],["c",790,1179,909,1088,909,885],["c",909,706,825,601,661,575],["l",444,620]]},"Q":{"xoff":1408,"width":1600,"height":1728,"hbx":64,"hby":1280,"path":[["m",649,0],["c",1134,-355,1257,-418,1451,-418],["c",1492,-418,1646,-279,1646,-279],["l",1634,-242],["l",1625,-236],["c",1625,-236,1558,-256,1462,-256],["c",1298,-256,1124,-183,833,14],["l",833,24],["c",1126,106,1335,364,1335,682],["c",1335,1030,1097,1280,755,1280],["c",376,1280,81,977,81,598],["c",81,247,313,0,649,0],["m",712,104],["c",444,104,258,332,258,659],["c",258,954,432,1157,686,1157],["c",962,1157,1152,929,1152,602],["c",1152,307,972,104,712,104]]},"R":{"xoff":1280,"width":1216,"height":1408,"hbx":64,"hby":1344,"path":[["m",612,576],["l",831,189],["c",896,73,980,0,1048,0],["l",1222,21],["l",1234,89],["l",1226,97],["c",1116,97,1052,141,972,267],["l",747,613],["c",937,697,1048,837,1048,996],["c",1048,1189,890,1312,636,1312],["c",636,1288,454,1280,384,1280],["c",307,1280,157,1286,157,1286],["l",143,1218],["l",147,1211],["c",147,1211,192,1216,217,1216],["c",276,1216,292,1193,292,1105],["l",290,247],["c",290,128,262,100,135,86],["l",116,-7],["c",116,-7,249,2,352,0],["c",448,-3,569,-5,569,-7],["l",587,79],["l",583,88],["c",452,88,436,108,436,255],["l",442,559],["l",612,576],["m",446,674],["c",448,817,454,960,466,1176],["c",468,1213,475,1224,503,1224],["c",753,1224,878,1134,878,954],["c",878,713,657,653,657,653],["l",446,674]]},"S":{"xoff":1088,"width":896,"height":1280,"hbx":64,"hby":1280,"path":[["m",448,0],["c",745,0,954,161,954,380],["c",954,554,753,642,575,728],["c",430,799,296,870,296,985],["c",296,1090,405,1169,554,1169],["c",739,1169,798,1125,798,991],["c",798,931,792,891,792,891],["l",804,882],["l",884,889],["c",896,1066,929,1216,929,1216],["l",923,1228],["c",923,1228,792,1280,610,1280],["c",344,1280,139,1117,139,916],["c",139,749,309,661,473,581],["c",630,504,784,435,784,311],["c",784,180,669,100,499,100],["c",278,100,233,157,233,433],["l",141,424],["c",141,238,116,90,116,90],["l",126,69],["c",126,69,255,0,448,0]]},"T":{"xoff":1088,"width":1152,"height":1408,"hbx":0,"hby":1344,"path":[["m",477,330],["c",477,119,462,101,272,85],["l",255,0],["c",255,-9,436,0,536,0],["c",632,0,837,-7,837,-7],["l",856,88],["l",849,96],["c",849,96,808,90,737,90],["c",653,90,620,128,620,226],["c",620,550,636,1038,653,1198],["c",950,1184,958,1178,999,938],["l",1095,946],["c",1095,946,1071,1114,1064,1286],["l",1046,1280],["l",872,1280],["l",237,1280],["l",67,1280],["l",49,1264],["c",43,1097,18,924,18,924],["l",114,931],["c",149,1180,155,1184,477,1198],["l",477,330]]},"U":{"xoff":1408,"width":1280,"height":1344,"hbx":64,"hby":1344,"path":[["m",376,513],["l",393,1082],["c",397,1156,421,1179,524,1192],["l",532,1280],["c",532,1298,405,1280,317,1280],["c",239,1280,86,1286,86,1286],["l",71,1196],["l",75,1188],["c",75,1188,120,1191,145,1191],["c",206,1191,221,1170,221,1086],["l",221,438],["c",221,161,382,0,669,0],["c",991,0,1177,161,1177,436],["l",1177,1094],["c",1177,1174,1200,1190,1318,1206],["l",1327,1280],["c",1327,1298,1216,1280,1128,1280],["c",1050,1280,896,1286,896,1286],["l",882,1196],["l",886,1188],["c",886,1188,950,1191,974,1191],["c",1034,1191,1044,1176,1050,1086],["c",1050,1086,1062,584,1062,447],["c",1062,232,942,116,718,116],["c",497,116,376,259,376,518],["l",376,513]]},"V":{"xoff":1280,"width":1344,"height":1408,"hbx":-64,"hby":1344,"path":[["m",174,1072],["c",346,536,528,-64,528,-64],["l",659,-19],["l",1099,1091],["c",1128,1169,1150,1185,1234,1189],["l",1251,1286],["c",1251,1286,1124,1280,1025,1280],["c",890,1280,733,1294,733,1294],["l",720,1206],["l",724,1216],["l",831,1216],["c",931,1216,972,1191,972,1132],["c",972,1070,739,453,632,173],["l",614,173],["c",614,173,356,1072,356,1139],["c",356,1199,393,1216,538,1222],["l",546,1271],["l",540,1280],["c",540,1302,341,1280,233,1280],["c",163,1280,-5,1286,-5,1286],["l",-19,1216],["l",-15,1189],["c",92,1187,149,1150,174,1072]]},"W":{"xoff":1920,"width":1984,"height":1408,"hbx":-64,"hby":1344,"path":[["m",1331,-19],["l",1761,1091],["c",1789,1171,1812,1185,1892,1189],["l",1906,1286],["c",1906,1286,1783,1280,1689,1280],["c",1558,1280,1404,1294,1404,1294],["l",1390,1206],["l",1394,1216],["l",1496,1216],["c",1595,1216,1636,1195,1636,1143],["c",1636,1080,1406,455,1304,173],["l",1292,173],["c",1292,173,1038,1070,1038,1139],["c",1038,1199,1075,1216,1216,1222],["l",1224,1271],["l",1218,1280],["c",1218,1302,1044,1280,921,1280],["c",853,1280,690,1286,690,1286],["l",675,1216],["l",679,1189],["c",780,1185,837,1155,864,1072],["l",901,959],["l",612,170],["l",600,170],["c",600,170,348,1044,348,1124],["c",348,1181,384,1198,524,1208],["l",532,1288],["l",526,1280],["c",526,1302,374,1280,229,1280],["c",161,1280,-3,1286,-3,1286],["l",-15,1216],["c",-15,1196,-13,1191,-13,1189],["c",90,1187,147,1150,172,1072],["c",344,538,514,-64,514,-64],["l",645,-19],["l",935,807],["l",948,807],["c",1087,357,1204,-64,1204,-64],["l",1331,-19]]},"X":{"xoff":1344,"width":1344,"height":1408,"hbx":0,"hby":1344,"path":[["m",370,365],["c",247,217,159,122,38,88],["l",24,6],["l",32,-9],["c",32,-9,155,0,235,0],["c",311,0,460,-15,460,-15],["l",475,72],["l",471,80],["c",389,86,352,104,352,140],["c",352,178,376,215,456,319],["l",645,564],["l",868,235],["c",894,196,909,170,909,146],["c",909,100,858,82,749,76],["l",741,-3],["l",747,0],["c",747,-17,950,0,1064,0],["c",1159,0,1318,-7,1318,-7],["l",1333,80],["l",1329,88],["c",1200,100,1122,150,1048,255],["l",749,683],["l",997,990],["c",1109,1129,1152,1175,1275,1199],["l",1288,1274],["l",1279,1288],["c",1279,1288,1161,1280,1081,1280],["c",1005,1280,856,1294,856,1294],["l",843,1215],["l",847,1207],["c",931,1199,966,1183,966,1147],["c",966,1091,790,882,698,757],["c",561,962,466,1107,466,1139],["c",466,1183,514,1203,626,1211],["l",632,1282],["l",626,1280],["c",626,1296,511,1280,350,1280],["c",255,1280,55,1286,55,1286],["l",43,1207],["l",47,1199],["c",172,1183,260,1131,327,1033],["l",595,639],["l",370,365]]},"Y":{"xoff":1088,"width":1216,"height":1408,"hbx":-64,"hby":1344,"path":[["m",333,1125],["c",333,1170,366,1186,489,1196],["l",495,1265],["l",489,1280],["c",489,1296,313,1280,198,1280],["c",104,1280,-27,1286,-27,1286],["l",-39,1209],["l",-35,1201],["c",124,1187,141,1136,223,974],["l",407,613],["c",456,518,466,467,466,390],["l",466,303],["c",466,157,454,118,307,90],["l",294,0],["c",294,-25,425,0,528,0],["c",618,0,788,-7,788,-7],["l",806,88],["l",802,96],["c",802,96,743,90,702,90],["c",630,90,610,124,612,226],["c",616,445,614,513,657,585],["l",862,938],["c",972,1129,989,1173,1130,1199],["l",1142,1274],["l",1134,1288],["c",1134,1288,1025,1280,946,1280],["c",870,1280,718,1294,718,1294],["l",706,1215],["l",710,1207],["c",798,1201,839,1181,839,1147],["c",839,1119,827,1083,806,1047],["l",573,621],["l",563,621],["c",561,621,333,1081,333,1139],["l",333,1125]]},"Z":{"xoff":1152,"width":1024,"height":1280,"hbx":64,"hby":1280,"path":[["m",1013,26],["c",1023,216,1064,428,1064,428],["l",968,418],["c",923,196,839,97,698,95],["l",282,81],["c",370,214,686,687,1073,1176],["l",1050,1235],["l",522,1250],["l",163,1280],["l",143,1262],["c",139,1081,106,878,106,878],["l",202,886],["c",225,1085,290,1150,479,1157],["l",833,1169],["l",69,59],["l",98,0],["l",241,11],["l",982,0],["l",1013,26]]},"[":{"xoff":640,"width":448,"height":1536,"hbx":192,"hby":1280,"path":[["m",569,-256],["l",581,-197],["l",573,-183],["l",335,-136],["l",335,1159],["l",569,1206],["l",581,1267],["l",573,1280],["l",196,1258],["c",196,1258,219,706,219,508],["c",219,311,196,-235,196,-235],["l",569,-256]]},"\\":{"xoff":704,"width":576,"height":1664,"hbx":64,"hby":1408,"path":[["m",75,1387],["c",75,1387,237,776,325,433],["c",411,83,497,-256,497,-256],["l",595,-256],["l",610,-240],["c",610,-240,501,134,421,456],["l",186,1408],["l",92,1408],["l",75,1387]]},"]":{"xoff":640,"width":448,"height":1536,"hbx":0,"hby":1280,"path":[["m",63,1280],["l",51,1220],["l",59,1206],["l",296,1159],["l",296,-136],["l",63,-183],["l",51,-245],["l",59,-256],["l",436,-235],["c",436,-235,413,317,413,514],["c",413,712,436,1258,436,1258],["l",63,1280]]},"^":{"xoff":1024,"width":896,"height":832,"hbx":64,"hby":960,"path":[["m",552,960],["l",456,955],["l",280,557],["c",200,379,114,163,114,163],["l",124,145],["l",227,131],["c",227,131,307,351,376,512],["l",499,814],["l",511,814],["l",655,485],["c",729,324,817,129,817,129],["l",839,128],["l",921,186],["c",921,186,819,394,747,555],["c",681,698,575,944,575,944],["l",552,960]]},"_":{"xoff":960,"width":1024,"height":192,"hbx":-64,"hby":-128,"path":[["m",937,-192],["c",937,-188,868,-190,780,-192],["c",690,-197,581,-199,499,-199],["c",317,-199,10,-197,10,-197],["l",-13,-297],["l",0,-320],["c",81,-315,606,-311,933,-311],["l",950,-207],["l",937,-192]]},"`":{"xoff":832,"width":448,"height":384,"hbx":128,"hby":1472,"path":[["m",147,1364],["c",147,1364,319,1239,491,1088],["l",509,1091],["l",550,1129],["c",403,1284,243,1472,243,1472],["l",223,1467],["l",145,1386],["l",147,1364]]},"a":{"xoff":960,"width":896,"height":896,"hbx":64,"hby":896,"path":[["m",579,484],["l",192,389],["c",126,372,83,313,83,242],["c",83,106,194,0,346,0],["c",387,0,473,61,571,157],["l",579,155],["c",589,50,651,0,761,0],["c",864,31,939,148,939,148],["l",911,178],["c",911,183,853,137,788,137],["c",735,137,704,168,704,221],["c",704,330,741,578,741,645],["c",741,797,634,896,456,896],["c",368,896,122,753,122,753],["l",147,674],["l",157,668],["c",157,668,270,760,403,760],["c",518,760,583,689,583,565],["l",579,484],["m",567,227],["c",509,175,432,139,380,139],["c",298,139,239,192,239,262],["c",239,300,260,328,298,339],["l",575,415],["l",567,227]]},"b":{"xoff":1024,"width":1024,"height":1472,"hbx":0,"hby":1472,"path":[["m",174,1231],["l",174,40],["l",192,24],["c",192,24,319,0,456,0],["c",739,0,966,223,966,490],["c",966,721,804,896,571,896],["c",542,896,448,842,323,752],["c",333,1140,352,1416,370,1445],["l",358,1472],["c",358,1472,196,1430,55,1411],["l",47,1343],["l",53,1337],["c",53,1337,75,1343,98,1343],["c",149,1343,174,1308,174,1231],["m",313,150],["l",319,658],["c",389,714,483,756,538,756],["c",690,756,808,608,808,422],["c",808,231,696,112,514,112],["c",448,112,362,129,313,150]]},"c":{"xoff":896,"width":768,"height":896,"hbx":64,"hby":896,"path":[["m",747,197],["c",747,197,630,137,516,137],["c",344,137,237,268,237,480],["c",237,675,329,785,497,785],["c",597,785,665,725,665,635],["l",665,579],["l",749,584],["c",755,727,792,842,792,842],["l",786,857],["c",786,857,677,896,546,896],["c",278,896,73,681,73,418],["c",73,173,241,0,501,0],["c",602,0,782,137,782,137],["l",759,193],["l",747,197]]},"d":{"xoff":1088,"width":1088,"height":1472,"hbx":64,"hby":1472,"path":[["m",724,144],["l",739,139],["c",753,44,812,0,921,0],["c",1017,26,1099,148,1099,148],["l",1071,178],["c",1071,185,1013,139,948,139],["c",894,139,864,171,864,225],["c",864,772,892,1394,921,1443],["l",909,1472],["c",909,1472,747,1428,606,1409],["l",597,1330],["c",597,1330,626,1338,649,1338],["c",700,1338,724,1303,724,1227],["l",724,888],["c",667,893,620,896,583,896],["c",303,896,73,675,73,406],["c",73,171,233,0,468,0],["c",497,0,583,49,724,144],["l",724,144],["m",724,232],["c",724,232,600,133,501,133],["c",350,133,231,281,231,469],["c",231,657,344,777,526,777],["c",649,777,724,735,724,735],["l",724,232]]},"e":{"xoff":896,"width":768,"height":896,"hbx":64,"hby":896,"path":[["m",235,587],["c",260,714,360,791,487,791],["c",595,791,657,741,657,650],["c",657,616,647,607,606,604],["l",235,587],["m",792,512],["l",819,536],["c",819,536,831,585,831,630],["c",831,793,726,896,526,896],["c",282,896,73,676,73,421],["c",73,178,245,0,503,0],["c",626,0,817,139,817,139],["l",794,192],["l",782,196],["c",782,196,657,139,530,139],["c",348,139,227,275,227,482],["l",227,512],["l",792,512]]},"f":{"xoff":704,"width":896,"height":1536,"hbx":64,"hby":1472,"path":[["m",92,805],["c",192,801,217,787,221,724],["l",221,193],["c",221,126,182,86,104,76],["l",94,0],["c",94,-9,208,0,323,0],["c",403,0,577,-5,577,-5],["l",591,83],["l",587,92],["c",587,92,534,88,464,88],["c",393,88,360,121,360,197],["l",368,793],["c",511,793,638,787,638,787],["l",659,896],["l",653,901],["c",653,901,516,896,370,896],["l",372,991],["c",376,1234,452,1351,608,1351],["c",741,1351,843,1279,843,1279],["l",866,1285],["c",896,1357,929,1414,929,1414],["l",925,1433],["c",925,1433,831,1472,692,1472],["c",405,1472,223,1255,221,917],["l",221,909],["l",98,887],["l",83,818],["l",92,805]]},"g":{"xoff":1024,"width":960,"height":1408,"hbx":64,"hby":960,"path":[["m",466,256],["c",694,256,872,413,872,610],["c",872,683,843,752,790,809],["l",798,819],["c",884,824,974,836,974,836],["l",997,951],["l",991,960],["c",991,960,812,908,708,896],["c",655,873,585,896,507,896],["c",305,896,126,732,126,554],["c",126,444,182,353,278,303],["l",278,294],["c",278,294,169,231,106,171],["c",106,82,202,3,329,-12],["l",329,-23],["c",329,-23,194,-109,126,-191],["c",126,-348,241,-448,436,-448],["c",696,-448,944,-275,944,-103],["c",944,28,825,82,507,97],["c",339,102,262,130,262,188],["c",262,213,292,242,348,272],["c",391,262,428,256,466,256],["m",516,346],["c",374,346,280,443,280,586],["c",280,711,358,791,483,791],["c",622,791,718,692,718,549],["c",718,422,640,346,516,346],["m",511,-348],["c",370,-348,286,-290,286,-195],["c",286,-111,413,-25,413,-25],["c",741,-64,812,-90,812,-163],["c",812,-260,671,-348,511,-348]]},"h":{"xoff":1088,"width":1088,"height":1536,"hbx":0,"hby":1472,"path":[["m",59,-5],["c",59,-5,176,0,262,0],["c",337,0,448,-7,448,-7],["l",466,81],["l",462,89],["c",462,89,415,86,391,86],["c",337,86,317,114,317,192],["c",317,347,319,506,323,652],["c",354,675,475,756,583,756],["c",692,756,753,684,753,559],["l",741,184],["c",741,118,708,81,626,59],["l",618,0],["c",618,-25,743,0,829,0],["c",905,0,1011,-7,1011,-7],["l",1028,81],["l",1023,89],["c",1023,89,976,86,952,86],["c",901,86,880,118,880,192],["c",880,301,913,574,913,641],["c",913,799,810,896,632,896],["c",554,896,364,762,325,737],["c",335,1115,354,1414,374,1445],["l",362,1472],["c",362,1472,200,1430,59,1411],["l",51,1345],["l",59,1339],["l",102,1339],["c",155,1339,178,1306,178,1231],["l",178,184],["c",178,114,149,87,71,79],["l",59,-5]]},"i":{"xoff":576,"width":448,"height":1536,"hbx":64,"hby":1472,"path":[["m",272,1246],["c",339,1246,393,1299,393,1367],["c",393,1428,350,1472,292,1472],["c",225,1472,172,1418,172,1351],["c",172,1289,212,1246,272,1246],["m",90,0],["c",90,-25,215,0,301,0],["c",376,0,483,-7,483,-7],["l",499,81],["l",495,90],["c",495,90,448,86,423,86],["c",372,86,352,121,352,202],["c",352,527,374,877,399,935],["l",389,960],["c",389,960,231,921,94,900],["l",86,823],["c",86,823,114,832,137,832],["c",188,832,212,796,212,720],["l",212,193],["c",212,121,180,81,98,59],["l",90,0]]},"j":{"xoff":512,"width":384,"height":1920,"hbx":0,"hby":1472,"path":[["m",67,-448],["c",235,-348,327,-185,327,8],["c",327,577,339,907,362,945],["l",352,969],["c",352,969,182,929,57,913],["l",49,838],["c",49,838,81,844,104,844],["c",165,844,186,818,186,736],["l",186,112],["c",186,-163,151,-280,34,-394],["l",30,-410],["l",67,-448],["m",247,1246],["c",315,1246,368,1299,368,1367],["c",368,1428,325,1472,268,1472],["c",200,1472,147,1418,147,1351],["c",147,1289,188,1246,247,1246]]},"k":{"xoff":1024,"width":1024,"height":1536,"hbx":0,"hby":1472,"path":[["m",59,-13],["c",59,-13,176,0,262,0],["c",337,0,448,-7,448,-7],["l",466,81],["l",462,89],["c",462,89,415,86,391,86],["c",337,86,317,115,317,196],["c",317,789,346,1402,374,1446],["l",362,1472],["c",362,1472,200,1432,59,1414],["l",55,1376],["c",53,1364,51,1352,51,1340],["c",51,1340,79,1348,102,1348],["c",153,1348,178,1315,178,1241],["l",178,269],["c",178,137,180,87,69,71],["l",59,-13],["m",610,143],["c",671,57,710,14,753,-9],["c",774,-41,798,-51,825,-51],["c",856,-51,976,-18,976,-18],["l",989,41],["l",982,51],["c",899,51,829,98,735,218],["l",520,492],["c",655,622,808,792,956,835],["l",972,897],["l",966,907],["c",966,907,849,896,772,896],["c",698,896,571,899,571,899],["l",552,841],["l",559,831],["c",638,831,671,818,671,788],["c",671,768,659,751,622,717],["l",372,490],["l",368,461],["l",610,143]]},"l":{"xoff":512,"width":512,"height":1536,"hbx":0,"hby":1472,"path":[["m",55,0],["c",55,-25,180,0,266,0],["c",341,0,448,-7,448,-7],["l",464,81],["l",460,89],["c",460,89,413,86,389,86],["c",337,86,317,117,317,196],["c",317,785,346,1403,374,1446],["l",362,1472],["c",362,1472,200,1432,59,1414],["l",55,1377],["c",53,1365,51,1353,51,1341],["c",51,1341,79,1349,102,1349],["c",153,1349,178,1315,178,1242],["l",178,270],["c",178,145,182,91,63,59],["l",55,0]]},"m":{"xoff":1728,"width":1600,"height":960,"hbx":64,"hby":896,"path":[["m",657,0],["c",657,-25,782,0,868,0],["c",944,0,1050,-7,1050,-7],["l",1066,81],["l",1062,89],["c",1062,89,1015,86,991,86],["c",939,86,919,118,919,192],["l",942,661],["c",987,692,1091,756,1189,756],["c",1298,756,1359,684,1359,559],["l",1351,184],["c",1351,114,1320,83,1243,71],["l",1232,-13],["c",1232,-13,1349,0,1435,0],["c",1511,0,1621,-7,1621,-7],["l",1640,81],["l",1636,89],["c",1636,89,1589,86,1564,86],["c",1511,86,1490,114,1490,192],["c",1490,301,1519,574,1519,641],["c",1519,793,1410,896,1238,896],["c",1159,896,964,758,929,735],["c",892,836,798,896,667,896],["c",593,896,417,775,366,741],["l",362,747],["c",366,816,384,881,384,881],["l",372,896],["c",372,896,227,861,86,840],["l",79,777],["l",86,769],["l",108,769],["c",182,769,208,739,208,652],["l",208,185],["c",208,114,180,87,102,79],["l",90,-5],["c",90,-5,206,0,292,0],["c",368,0,479,-7,479,-7],["l",497,81],["l",493,89],["c",493,89,446,86,421,86],["c",368,86,348,114,348,193],["c",348,267,360,532,366,664],["c",407,688,518,756,618,756],["c",726,756,788,686,788,563],["l",780,196],["c",780,131,747,96,665,76],["l",657,0]]},"n":{"xoff":1152,"width":1024,"height":960,"hbx":64,"hby":896,"path":[["m",657,0],["c",657,-25,782,0,868,0],["c",944,0,1050,-7,1050,-7],["l",1066,81],["l",1062,89],["c",1062,89,1015,86,991,86],["c",939,86,919,118,919,192],["c",919,301,948,574,948,641],["c",948,793,839,896,667,896],["c",602,896,415,773,366,741],["l",362,747],["c",366,816,384,881,384,881],["l",372,896],["c",372,896,227,861,86,840],["l",79,777],["l",86,769],["l",108,769],["c",182,769,208,739,208,652],["l",208,185],["c",208,114,178,83,100,71],["l",90,-13],["c",90,-13,206,0,292,0],["c",368,0,479,-7,479,-7],["l",497,81],["l",493,89],["c",493,89,446,86,421,86],["c",368,86,348,114,348,193],["c",348,267,360,532,366,664],["c",407,688,518,756,618,756],["c",726,756,788,686,788,563],["l",780,196],["c",780,131,747,96,665,76],["l",657,0]]},"o":{"xoff":1024,"width":896,"height":896,"hbx":64,"hby":896,"path":[["m",471,0],["c",739,0,946,214,946,476],["c",946,717,782,896,548,896],["c",280,896,73,680,73,418],["c",73,177,235,0,471,0],["m",528,100],["c",356,100,237,250,237,471],["c",237,664,333,785,487,785],["c",659,785,778,631,778,410],["c",778,219,681,100,528,100]]},"p":{"xoff":1088,"width":960,"height":1408,"hbx":64,"hby":896,"path":[["m",102,-397],["l",92,-448],["c",92,-463,192,-448,309,-448],["l",503,-448],["l",520,-371],["l",516,-384],["c",493,-365,468,-367,446,-367],["c",368,-367,350,-330,350,-204],["c",350,-134,348,-62,348,8],["c",348,8,448,0,497,0],["c",776,0,1007,228,1007,493],["c",1007,725,847,896,612,896],["c",581,896,495,846,374,762],["l",366,777],["c",372,830,387,887,387,887],["l",374,896],["c",374,896,229,862,88,842],["l",81,780],["l",88,773],["l",110,773],["c",184,773,210,743,210,660],["l",210,106],["c",210,18,206,-169,206,-235],["c",206,-348,190,-373,102,-383],["l",102,-397],["m",350,147],["c",350,307,356,519,366,671],["c",438,719,524,756,579,756],["c",731,756,849,611,849,425],["c",849,232,737,112,554,112],["c",487,112,403,127,350,147],["l",350,147]]},"q":{"xoff":1088,"width":960,"height":1408,"hbx":64,"hby":896,"path":[["m",571,-448],["c",571,-457,696,-448,790,-448],["l",978,-448],["l",993,-369],["l",989,-365],["c",989,-365,964,-367,935,-367],["c",872,-367,862,-342,862,-194],["c",862,436,876,825,901,879],["l",884,896],["c",884,896,833,874,772,854],["c",710,889,640,896,583,896],["c",303,896,73,667,73,404],["c",73,173,235,0,468,0],["c",497,0,591,55,724,145],["l",716,-249],["c",712,-348,694,-366,581,-372],["l",571,-448],["m",724,235],["c",724,235,600,133,501,133],["c",350,133,231,280,231,466],["c",231,658,344,777,526,777],["c",649,777,724,735,724,735],["l",724,235]]},"r":{"xoff":768,"width":704,"height":960,"hbx":64,"hby":896,"path":[["m",120,76],["l",110,0],["c",110,-9,204,0,325,0],["c",405,0,534,-5,534,-5],["l",552,86],["l",550,93],["c",550,93,489,90,460,90],["c",382,90,362,114,362,200],["c",362,242,378,590,378,590],["c",436,670,509,719,569,719],["c",614,719,624,695,624,590],["l",704,595],["c",708,712,737,879,737,879],["l",731,887],["c",731,887,712,896,667,896],["c",585,896,462,805,378,679],["l",370,685],["c",368,779,389,893,389,893],["l",374,896],["c",374,896,223,859,98,838],["l",92,779],["l",102,765],["c",102,765,122,771,145,771],["c",200,771,223,738,223,654],["l",223,233],["c",223,113,202,81,120,73],["l",120,76]]},"s":{"xoff":832,"width":704,"height":896,"hbx":64,"hby":896,"path":[["m",350,0],["c",550,0,724,133,724,274],["c",724,366,659,425,438,530],["c",311,589,260,637,260,696],["c",260,751,333,797,425,797],["c",542,797,593,758,593,670],["c",593,654,589,617,589,617],["l",665,622],["c",675,744,704,852,704,852],["l",700,863],["c",700,863,606,896,495,896],["c",280,896,118,773,118,622],["c",118,534,186,466,341,394],["c",530,304,579,265,579,204],["c",579,144,497,96,395,96],["c",249,96,196,155,196,317],["l",124,307],["c",122,247,108,99,100,57],["l",106,43],["c",106,43,200,0,350,0]]},"t":{"xoff":704,"width":640,"height":1088,"hbx":0,"hby":1088,"path":[["m",167,246],["c",167,67,235,0,421,0],["c",471,0,628,122,628,122],["l",608,175],["c",608,175,536,139,468,139],["c",352,139,309,190,309,328],["c",309,537,315,708,323,836],["l",620,829],["l",638,938],["l",632,944],["l",331,938],["c",339,1026,348,1073,348,1073],["l",307,1088],["c",307,1088,186,981,53,922],["l",43,860],["l",51,848],["c",141,844,167,819,167,746],["l",167,246]]},"u":{"xoff":1088,"width":1152,"height":896,"hbx":0,"hby":896,"path":[["m",176,228],["c",176,83,272,0,448,0],["c",485,0,602,69,733,167],["l",743,163],["c",753,55,815,0,925,0],["c",995,0,1103,162,1103,162],["l",1075,191],["c",1075,191,1017,145,952,145],["c",899,145,868,176,868,230],["c",868,527,888,818,913,873],["l",901,896],["c",901,896,731,860,585,842],["l",577,775],["c",577,775,614,777,626,777],["c",702,777,729,751,729,677],["l",729,247],["c",661,202,575,141,481,141],["c",370,141,317,201,317,323],["c",317,540,344,808,370,873],["l",358,896],["c",358,896,192,859,65,840],["l",57,771],["c",57,771,86,779,108,779],["c",159,779,184,744,184,679],["l",176,228]]},"v":{"xoff":896,"width":1024,"height":1024,"hbx":-64,"hby":960,"path":[["m",708,760],["c",708,712,612,504,460,133],["l",452,133],["c",452,133,278,712,278,770],["c",278,807,305,819,399,823],["l",411,885],["l",407,896],["c",407,910,286,896,161,896],["c",114,896,-9,898,-9,898],["l",-21,830],["l",-17,822],["c",53,820,100,785,122,719],["c",182,543,372,-64,372,-64],["l",483,-30],["l",780,668],["c",831,787,853,814,911,822],["l",925,898],["c",925,898,829,896,757,896],["c",657,896,544,898,544,898],["l",534,834],["l",542,822],["l",620,822],["c",686,822,708,810,708,773],["l",708,760]]},"w":{"xoff":1472,"width":1536,"height":1024,"hbx":-64,"hby":960,"path":[["m",1232,773],["c",1232,724,1140,513,993,136],["l",985,136],["c",985,136,817,724,817,783],["c",817,818,839,828,933,832],["l",946,896],["l",942,906],["c",942,906,823,896,702,896],["c",657,896,538,898,538,898],["l",526,830],["l",530,822],["c",614,822,647,773,675,687],["c",638,584,563,402,458,136],["l",450,136],["c",450,136,282,719,282,783],["c",282,820,309,832,399,836],["l",411,900],["l",407,896],["c",407,910,290,896,167,896],["c",122,896,4,898,4,898],["l",-9,830],["l",-5,822],["c",65,820,108,785,131,719],["c",188,543,372,-64,372,-64],["l",483,-30],["l",710,539],["l",722,539],["c",798,294,907,-64,907,-64],["l",1015,-30],["l",1304,668],["c",1353,787,1376,816,1431,822],["l",1445,898],["c",1445,898,1345,896,1277,896],["c",1179,896,1075,900,1075,900],["l",1064,836],["l",1073,824],["l",1148,824],["c",1210,824,1232,810,1232,773]]},"x":{"xoff":960,"width":960,"height":1024,"hbx":0,"hby":960,"path":[["m",753,0],["c",819,0,939,-5,939,-5],["l",952,63],["l",948,71],["c",866,79,810,122,741,220],["l",552,479],["l",729,679],["c",796,755,858,814,901,828],["l",913,892],["l",907,902],["c",907,902,817,896,761,896],["l",612,896],["l",602,830],["l",606,822],["c",675,822,694,816,694,796],["c",694,769,667,739,630,695],["l",505,543],["l",393,701],["c",366,739,344,769,344,794],["c",344,822,370,832,436,832],["l",448,894],["l",444,896],["c",444,904,352,896,235,896],["c",169,896,28,900,28,900],["l",16,832],["l",20,824],["c",118,808,151,777,241,652],["l",397,438],["l",221,239],["c",133,140,104,103,30,65],["l",18,3],["l",24,-7],["c",24,-7,92,0,147,0],["c",194,0,317,-9,317,-9],["l",329,57],["l",325,65],["c",253,69,235,75,235,101],["c",235,136,366,287,442,376],["l",591,174],["c",616,140,626,116,626,101],["c",626,73,600,61,532,59],["l",520,-3],["l",524,0],["c",524,-13,671,0,753,0]]},"y":{"xoff":896,"width":1024,"height":1472,"hbx":-64,"hby":960,"path":[["m",462,194],["c",462,194,280,711,280,777],["c",280,812,307,823,401,827],["l",413,886],["l",409,896],["c",409,910,284,896,163,896],["c",116,896,-7,898,-7,898],["l",-19,834],["l",-15,826],["c",53,824,92,797,124,734],["c",202,550,329,211,393,22],["c",301,-190,151,-317,-7,-317],["l",-17,-332],["c",-17,-358,53,-448,73,-448],["c",253,-453,323,-326,534,130],["l",798,716],["c",827,792,851,817,913,826],["l",927,898],["c",927,898,825,896,753,896],["c",653,896,546,904,546,904],["l",534,840],["l",538,832],["l",632,832],["c",686,832,710,817,710,782],["c",710,743,565,412,471,199],["l",462,194]]},"z":{"xoff":960,"width":832,"height":1024,"hbx":64,"hby":960,"path":[["m",94,-3],["l",200,8],["l",776,0],["l",808,31],["c",808,171,843,345,843,345],["l",761,335],["c",733,173,677,105,569,97],["l",266,80],["c",325,163,561,489,851,848],["l",835,891],["l",405,902],["l",143,896],["l",131,886],["c",129,763,108,607,108,607],["l",188,618],["c",202,747,241,784,374,792],["l",630,803],["l",73,49],["l",94,-3]]},"{":{"xoff":640,"width":576,"height":1536,"hbx":64,"hby":1280,"path":[["m",94,490],["c",204,466,292,415,292,317],["c",292,236,208,87,208,-29],["c",208,-150,301,-256,462,-256],["c",524,-256,573,-241,573,-241],["l",589,-186],["l",583,-174],["c",583,-174,522,-186,481,-186],["c",389,-186,354,-123,354,-52],["c",354,38,409,203,409,307],["c",409,427,337,486,260,513],["l",260,525],["c",329,547,409,602,409,722],["c",409,820,354,985,354,1073],["c",354,1144,389,1209,479,1209],["c",514,1209,573,1199,573,1199],["l",589,1258],["l",583,1267],["c",583,1267,520,1280,466,1280],["c",298,1280,208,1173,208,1051],["c",208,936,292,784,292,694],["c",292,610,200,557,102,531],["l",94,490]]},"|":{"xoff":768,"width":256,"height":2240,"hbx":256,"hby":1664,"path":[["m",438,1664],["l",315,1641],["l",313,558],["c",311,186,311,-564,311,-564],["l",329,-576],["l",450,-554],["c",450,-554,448,231,448,589],["c",448,935,460,1651,460,1651],["l",438,1664]]},"}":{"xoff":640,"width":576,"height":1536,"hbx":0,"hby":1280,"path":[["m",538,533],["c",428,557,339,608,339,706],["c",339,786,423,936,423,1051],["c",423,1173,331,1280,169,1280],["c",108,1280,59,1264,59,1264],["l",43,1209],["l",49,1197],["c",49,1197,110,1209,151,1209],["c",243,1209,278,1146,278,1075],["c",278,985,223,820,223,716],["c",223,596,294,537,372,509],["l",372,498],["c",303,476,223,421,223,301],["c",223,203,278,38,278,-50],["c",278,-121,243,-186,153,-186],["c",118,-186,59,-176,59,-176],["l",43,-235],["l",49,-245],["c",49,-245,112,-256,165,-256],["c",333,-256,423,-150,423,-29],["c",423,87,339,238,339,329],["c",339,413,432,466,530,492],["l",538,533]]},"~":{"xoff":1024,"width":896,"height":320,"hbx":64,"hby":704,"path":[["m",145,384],["c",145,384,225,512,274,512],["c",368,532,655,444,765,444],["l",798,453],["l",954,643],["l",954,655],["l",909,704],["l",896,704],["c",896,704,817,576,767,576],["c",673,555,387,643,276,643],["l",243,634],["l",88,444],["l",88,432],["l",133,384],["l",145,384]]}},"exporter":"SimpleJson","version":"0.0.3"};
 
-},{}],22:[function(require,module,exports){
+},{}],14:[function(require,module,exports){
 var tmpBounds = { x: 0, y: 0, width: 0, height: 0, glyphs: 0 };
 
 function isWhitespace(chr) {
@@ -3922,9 +1845,34 @@ WordWrap.Line = function(start, end, width) {
 };
 
 module.exports = WordWrap;
-},{}],23:[function(require,module,exports){
+},{}],15:[function(require,module,exports){
+if (typeof Object.create === 'function') {
+  // implementation from standard node.js 'util' module
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    ctor.prototype = Object.create(superCtor.prototype, {
+      constructor: {
+        value: ctor,
+        enumerable: false,
+        writable: true,
+        configurable: true
+      }
+    });
+  };
+} else {
+  // old school shim for old browsers
+  module.exports = function inherits(ctor, superCtor) {
+    ctor.super_ = superCtor
+    var TempCtor = function () {}
+    TempCtor.prototype = superCtor.prototype
+    ctor.prototype = new TempCtor()
+    ctor.prototype.constructor = ctor
+  }
+}
+
+},{}],16:[function(require,module,exports){
 module.exports=require(11)
-},{}],24:[function(require,module,exports){
+},{"/projects/fontpath-modules/fontpath-renderer/node_modules/fontpath-shape2d/node_modules/shape2d/node_modules/interpolation/index.js":11}],17:[function(require,module,exports){
 var poly2tri = require('poly2tri');
 var util = require('point-util');
 
@@ -4047,7 +1995,7 @@ module.exports = function (shapes, steinerPoints) {
     }
     return allTris;
 };
-},{"point-util":25,"poly2tri":31}],25:[function(require,module,exports){
+},{"point-util":18,"poly2tri":24}],18:[function(require,module,exports){
 module.exports.isClockwise = function(points) {
     var sum = 0;
     for (var i=0; i<points.length; i++) {
@@ -4116,9 +2064,9 @@ module.exports.getBounds = function(contour) {
         maxY: maxY
     };
 }
-},{}],26:[function(require,module,exports){
+},{}],19:[function(require,module,exports){
 module.exports={"version": "1.3.5"}
-},{}],27:[function(require,module,exports){
+},{}],20:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4299,7 +2247,7 @@ module.exports = AdvancingFront;
 module.exports.Node = Node;
 
 
-},{}],28:[function(require,module,exports){
+},{}],21:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4334,7 +2282,7 @@ module.exports = assert;
 
 
 
-},{}],29:[function(require,module,exports){
+},{}],22:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4611,7 +2559,7 @@ Point.dot = function(a, b) {
 
 module.exports = Point;
 
-},{"./xy":36}],30:[function(require,module,exports){
+},{"./xy":29}],23:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -4665,7 +2613,7 @@ PointError.prototype.constructor = PointError;
 
 module.exports = PointError;
 
-},{"./xy":36}],31:[function(require,module,exports){
+},{"./xy":29}],24:[function(require,module,exports){
 (function (global){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
@@ -4784,8 +2732,8 @@ exports.triangulate = sweep.triangulate;
  */
 exports.sweep = {Triangulate: sweep.triangulate};
 
-}).call(this,typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{"../dist/version.json":26,"./point":29,"./pointerror":30,"./sweep":32,"./sweepcontext":33,"./triangle":34}],32:[function(require,module,exports){
+}).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
+},{"../dist/version.json":19,"./point":22,"./pointerror":23,"./sweep":25,"./sweepcontext":26,"./triangle":27}],25:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -5621,7 +3569,7 @@ function flipScanEdgeEvent(tcx, ep, eq, flip_triangle, t, p) {
 
 exports.triangulate = triangulate;
 
-},{"./advancingfront":27,"./assert":28,"./pointerror":30,"./triangle":34,"./utils":35}],33:[function(require,module,exports){
+},{"./advancingfront":20,"./assert":21,"./pointerror":23,"./triangle":27,"./utils":28}],26:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6164,7 +4112,7 @@ SweepContext.prototype.meshClean = function(triangle) {
 
 module.exports = SweepContext;
 
-},{"./advancingfront":27,"./point":29,"./pointerror":30,"./sweep":32,"./triangle":34}],34:[function(require,module,exports){
+},{"./advancingfront":20,"./point":22,"./pointerror":23,"./sweep":25,"./triangle":27}],27:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6727,7 +4675,7 @@ Triangle.prototype.markConstrainedEdgeByPoints = function(p, q) {
 
 module.exports = Triangle;
 
-},{"./xy":36}],35:[function(require,module,exports){
+},{"./xy":29}],28:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6838,7 +4786,7 @@ function isAngleObtuse(pa, pb, pc) {
 exports.isAngleObtuse = isAngleObtuse;
 
 
-},{}],36:[function(require,module,exports){
+},{}],29:[function(require,module,exports){
 /*
  * Poly2Tri Copyright (c) 2009-2014, Poly2Tri Contributors
  * http://code.google.com/p/poly2tri/
@@ -6947,20 +4895,2109 @@ module.exports = {
     equals: equals
 };
 
+},{}],30:[function(require,module,exports){
+var ARRAY_TYPE = typeof Float32Array !== "undefined" ? Float32Array : Array;
+
+function Matrix3(m) {
+    this.val = new ARRAY_TYPE(9);
+
+    if (m) { //assume Matrix3 with val
+        this.copy(m);
+    } else { //default to identity
+        this.idt();
+    }
+}
+
+var mat3 = Matrix3.prototype;
+
+mat3.clone = function() {
+    return new Matrix3(this);
+};
+
+mat3.set = function(otherMat) {
+    return this.copy(otherMat);
+};
+
+mat3.copy = function(otherMat) {
+    var out = this.val,
+        a = otherMat.val; 
+    out[0] = a[0];
+    out[1] = a[1];
+    out[2] = a[2];
+    out[3] = a[3];
+    out[4] = a[4];
+    out[5] = a[5];
+    out[6] = a[6];
+    out[7] = a[7];
+    out[8] = a[8];
+    return this;
+};
+
+mat3.fromMat4 = function(m) {
+    var a = m.val,
+        out = this.val;
+    out[0] = a[0];
+    out[1] = a[1];
+    out[2] = a[2];
+    out[3] = a[4];
+    out[4] = a[5];
+    out[5] = a[6];
+    out[6] = a[8];
+    out[7] = a[9];
+    out[8] = a[10];
+    return this;
+};
+
+mat3.fromArray = function(a) {
+    var out = this.val;
+    out[0] = a[0];
+    out[1] = a[1];
+    out[2] = a[2];
+    out[3] = a[3];
+    out[4] = a[4];
+    out[5] = a[5];
+    out[6] = a[6];
+    out[7] = a[7];
+    out[8] = a[8];
+    return this;
+};
+
+mat3.identity = function() {
+    var out = this.val;
+    out[0] = 1;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 1;
+    out[5] = 0;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 1;
+    return this;
+};
+
+mat3.transpose = function() {
+    var a = this.val,
+        a01 = a[1], 
+        a02 = a[2], 
+        a12 = a[5];
+    a[1] = a[3];
+    a[2] = a[6];
+    a[3] = a01;
+    a[5] = a[7];
+    a[6] = a02;
+    a[7] = a12;
+    return this;
+};
+
+mat3.invert = function() {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2],
+        a10 = a[3], a11 = a[4], a12 = a[5],
+        a20 = a[6], a21 = a[7], a22 = a[8],
+
+        b01 = a22 * a11 - a12 * a21,
+        b11 = -a22 * a10 + a12 * a20,
+        b21 = a21 * a10 - a11 * a20,
+
+        // Calculate the determinant
+        det = a00 * b01 + a01 * b11 + a02 * b21;
+
+    if (!det) { 
+        return null; 
+    }
+    det = 1.0 / det;
+
+    a[0] = b01 * det;
+    a[1] = (-a22 * a01 + a02 * a21) * det;
+    a[2] = (a12 * a01 - a02 * a11) * det;
+    a[3] = b11 * det;
+    a[4] = (a22 * a00 - a02 * a20) * det;
+    a[5] = (-a12 * a00 + a02 * a10) * det;
+    a[6] = b21 * det;
+    a[7] = (-a21 * a00 + a01 * a20) * det;
+    a[8] = (a11 * a00 - a01 * a10) * det;
+    return this;
+};
+
+mat3.adjoint = function() {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2],
+        a10 = a[3], a11 = a[4], a12 = a[5],
+        a20 = a[6], a21 = a[7], a22 = a[8];
+
+    a[0] = (a11 * a22 - a12 * a21);
+    a[1] = (a02 * a21 - a01 * a22);
+    a[2] = (a01 * a12 - a02 * a11);
+    a[3] = (a12 * a20 - a10 * a22);
+    a[4] = (a00 * a22 - a02 * a20);
+    a[5] = (a02 * a10 - a00 * a12);
+    a[6] = (a10 * a21 - a11 * a20);
+    a[7] = (a01 * a20 - a00 * a21);
+    a[8] = (a00 * a11 - a01 * a10);
+    return this;
+};
+
+mat3.determinant = function() {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2],
+        a10 = a[3], a11 = a[4], a12 = a[5],
+        a20 = a[6], a21 = a[7], a22 = a[8];
+
+    return a00 * (a22 * a11 - a12 * a21) + a01 * (-a22 * a10 + a12 * a20) + a02 * (a21 * a10 - a11 * a20);
+};
+
+mat3.multiply = function(otherMat) {
+    var a = this.val,
+        b = otherMat.val,
+        a00 = a[0], a01 = a[1], a02 = a[2],
+        a10 = a[3], a11 = a[4], a12 = a[5],
+        a20 = a[6], a21 = a[7], a22 = a[8],
+
+        b00 = b[0], b01 = b[1], b02 = b[2],
+        b10 = b[3], b11 = b[4], b12 = b[5],
+        b20 = b[6], b21 = b[7], b22 = b[8];
+
+    a[0] = b00 * a00 + b01 * a10 + b02 * a20;
+    a[1] = b00 * a01 + b01 * a11 + b02 * a21;
+    a[2] = b00 * a02 + b01 * a12 + b02 * a22;
+
+    a[3] = b10 * a00 + b11 * a10 + b12 * a20;
+    a[4] = b10 * a01 + b11 * a11 + b12 * a21;
+    a[5] = b10 * a02 + b11 * a12 + b12 * a22;
+
+    a[6] = b20 * a00 + b21 * a10 + b22 * a20;
+    a[7] = b20 * a01 + b21 * a11 + b22 * a21;
+    a[8] = b20 * a02 + b21 * a12 + b22 * a22;
+    return this;
+};
+
+mat3.translate = function(v) {
+    var a = this.val,
+        x = v.x, y = v.y;
+    a[6] = x * a[0] + y * a[3] + a[6];
+    a[7] = x * a[1] + y * a[4] + a[7];
+    a[8] = x * a[2] + y * a[5] + a[8];
+    return this;
+};
+
+mat3.rotate = function(rad) {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2],
+        a10 = a[3], a11 = a[4], a12 = a[5],
+
+        s = Math.sin(rad),
+        c = Math.cos(rad);
+
+    a[0] = c * a00 + s * a10;
+    a[1] = c * a01 + s * a11;
+    a[2] = c * a02 + s * a12;
+
+    a[3] = c * a10 - s * a00;
+    a[4] = c * a11 - s * a01;
+    a[5] = c * a12 - s * a02;
+    return this;
+};
+
+mat3.scale = function(v) {
+    var a = this.val,
+        x = v.x, 
+        y = v.y;
+
+    a[0] = x * a[0];
+    a[1] = x * a[1];
+    a[2] = x * a[2];
+
+    a[3] = y * a[3];
+    a[4] = y * a[4];
+    a[5] = y * a[5];
+    return this;
+};
+
+mat3.fromQuat = function(q) {
+    var x = q.x, y = q.y, z = q.z, w = q.w,
+        x2 = x + x,
+        y2 = y + y,
+        z2 = z + z,
+
+        xx = x * x2,
+        xy = x * y2,
+        xz = x * z2,
+        yy = y * y2,
+        yz = y * z2,
+        zz = z * z2,
+        wx = w * x2,
+        wy = w * y2,
+        wz = w * z2,
+
+        out = this.val;
+
+    out[0] = 1 - (yy + zz);
+    out[3] = xy + wz;
+    out[6] = xz - wy;
+
+    out[1] = xy - wz;
+    out[4] = 1 - (xx + zz);
+    out[7] = yz + wx;
+
+    out[2] = xz + wy;
+    out[5] = yz - wx;
+    out[8] = 1 - (xx + yy);
+    return this;
+};
+
+mat3.normalFromMat4 = function(m) {
+    var a = m.val,
+        out = this.val,
+
+        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+
+        b00 = a00 * a11 - a01 * a10,
+        b01 = a00 * a12 - a02 * a10,
+        b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11,
+        b04 = a01 * a13 - a03 * a11,
+        b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30,
+        b07 = a20 * a32 - a22 * a30,
+        b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31,
+        b10 = a21 * a33 - a23 * a31,
+        b11 = a22 * a33 - a23 * a32,
+
+        // Calculate the determinant
+        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+
+    if (!det) { 
+        return null; 
+    }
+    det = 1.0 / det;
+
+    out[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    out[1] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    out[2] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+
+    out[3] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    out[4] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    out[5] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+
+    out[6] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    out[7] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    out[8] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+    return this;
+};
+
+mat3.mul = mat3.multiply;
+
+mat3.idt = mat3.identity;
+
+//This is handy for Pool utilities, to "reset" a
+//shared object to its default state
+mat3.reset = mat3.idt;
+
+mat3.toString = function() {
+    var a = this.val;
+    return 'Matrix3(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + 
+                    a[3] + ', ' + a[4] + ', ' + a[5] + ', ' + 
+                    a[6] + ', ' + a[7] + ', ' + a[8] + ')';
+};
+
+mat3.str = mat3.toString;
+
+module.exports = Matrix3;
+},{}],31:[function(require,module,exports){
+var ARRAY_TYPE = typeof Float32Array !== "undefined" ? Float32Array : Array;
+var EPSILON = 0.000001;
+
+function Matrix4(m) {
+    this.val = new ARRAY_TYPE(16);
+
+    if (m) { //assume Matrix4 with val
+        this.copy(m);
+    } else { //default to identity
+        this.idt();
+    }
+}
+
+var mat4 = Matrix4.prototype;
+
+mat4.clone = function() {
+    return new Matrix4(this);
+};
+
+mat4.set = function(otherMat) {
+    return this.copy(otherMat);
+};
+
+mat4.copy = function(otherMat) {
+    var out = this.val,
+        a = otherMat.val; 
+    out[0] = a[0];
+    out[1] = a[1];
+    out[2] = a[2];
+    out[3] = a[3];
+    out[4] = a[4];
+    out[5] = a[5];
+    out[6] = a[6];
+    out[7] = a[7];
+    out[8] = a[8];
+    out[9] = a[9];
+    out[10] = a[10];
+    out[11] = a[11];
+    out[12] = a[12];
+    out[13] = a[13];
+    out[14] = a[14];
+    out[15] = a[15];
+    return this;
+};
+
+mat4.fromArray = function(a) {
+    var out = this.val;
+    out[0] = a[0];
+    out[1] = a[1];
+    out[2] = a[2];
+    out[3] = a[3];
+    out[4] = a[4];
+    out[5] = a[5];
+    out[6] = a[6];
+    out[7] = a[7];
+    out[8] = a[8];
+    out[9] = a[9];
+    out[10] = a[10];
+    out[11] = a[11];
+    out[12] = a[12];
+    out[13] = a[13];
+    out[14] = a[14];
+    out[15] = a[15];
+    return this;
+};
+
+mat4.identity = function() {
+    var out = this.val;
+    out[0] = 1;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = 1;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = 1;
+    out[11] = 0;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = 0;
+    out[15] = 1;
+    return this;
+};
+
+mat4.transpose = function() {
+    var a = this.val,
+        a01 = a[1], a02 = a[2], a03 = a[3],
+        a12 = a[6], a13 = a[7],
+        a23 = a[11];
+
+    a[1] = a[4];
+    a[2] = a[8];
+    a[3] = a[12];
+    a[4] = a01;
+    a[6] = a[9];
+    a[7] = a[13];
+    a[8] = a02;
+    a[9] = a12;
+    a[11] = a[14];
+    a[12] = a03;
+    a[13] = a13;
+    a[14] = a23;
+    return this;
+};
+
+mat4.invert = function() {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+
+        b00 = a00 * a11 - a01 * a10,
+        b01 = a00 * a12 - a02 * a10,
+        b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11,
+        b04 = a01 * a13 - a03 * a11,
+        b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30,
+        b07 = a20 * a32 - a22 * a30,
+        b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31,
+        b10 = a21 * a33 - a23 * a31,
+        b11 = a22 * a33 - a23 * a32,
+
+        // Calculate the determinant
+        det = b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+
+    if (!det) { 
+        return null; 
+    }
+    det = 1.0 / det;
+
+    a[0] = (a11 * b11 - a12 * b10 + a13 * b09) * det;
+    a[1] = (a02 * b10 - a01 * b11 - a03 * b09) * det;
+    a[2] = (a31 * b05 - a32 * b04 + a33 * b03) * det;
+    a[3] = (a22 * b04 - a21 * b05 - a23 * b03) * det;
+    a[4] = (a12 * b08 - a10 * b11 - a13 * b07) * det;
+    a[5] = (a00 * b11 - a02 * b08 + a03 * b07) * det;
+    a[6] = (a32 * b02 - a30 * b05 - a33 * b01) * det;
+    a[7] = (a20 * b05 - a22 * b02 + a23 * b01) * det;
+    a[8] = (a10 * b10 - a11 * b08 + a13 * b06) * det;
+    a[9] = (a01 * b08 - a00 * b10 - a03 * b06) * det;
+    a[10] = (a30 * b04 - a31 * b02 + a33 * b00) * det;
+    a[11] = (a21 * b02 - a20 * b04 - a23 * b00) * det;
+    a[12] = (a11 * b07 - a10 * b09 - a12 * b06) * det;
+    a[13] = (a00 * b09 - a01 * b07 + a02 * b06) * det;
+    a[14] = (a31 * b01 - a30 * b03 - a32 * b00) * det;
+    a[15] = (a20 * b03 - a21 * b01 + a22 * b00) * det;
+    return this;
+};
+
+mat4.adjoint = function() {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+    a[0]  =  (a11 * (a22 * a33 - a23 * a32) - a21 * (a12 * a33 - a13 * a32) + a31 * (a12 * a23 - a13 * a22));
+    a[1]  = -(a01 * (a22 * a33 - a23 * a32) - a21 * (a02 * a33 - a03 * a32) + a31 * (a02 * a23 - a03 * a22));
+    a[2]  =  (a01 * (a12 * a33 - a13 * a32) - a11 * (a02 * a33 - a03 * a32) + a31 * (a02 * a13 - a03 * a12));
+    a[3]  = -(a01 * (a12 * a23 - a13 * a22) - a11 * (a02 * a23 - a03 * a22) + a21 * (a02 * a13 - a03 * a12));
+    a[4]  = -(a10 * (a22 * a33 - a23 * a32) - a20 * (a12 * a33 - a13 * a32) + a30 * (a12 * a23 - a13 * a22));
+    a[5]  =  (a00 * (a22 * a33 - a23 * a32) - a20 * (a02 * a33 - a03 * a32) + a30 * (a02 * a23 - a03 * a22));
+    a[6]  = -(a00 * (a12 * a33 - a13 * a32) - a10 * (a02 * a33 - a03 * a32) + a30 * (a02 * a13 - a03 * a12));
+    a[7]  =  (a00 * (a12 * a23 - a13 * a22) - a10 * (a02 * a23 - a03 * a22) + a20 * (a02 * a13 - a03 * a12));
+    a[8]  =  (a10 * (a21 * a33 - a23 * a31) - a20 * (a11 * a33 - a13 * a31) + a30 * (a11 * a23 - a13 * a21));
+    a[9]  = -(a00 * (a21 * a33 - a23 * a31) - a20 * (a01 * a33 - a03 * a31) + a30 * (a01 * a23 - a03 * a21));
+    a[10] =  (a00 * (a11 * a33 - a13 * a31) - a10 * (a01 * a33 - a03 * a31) + a30 * (a01 * a13 - a03 * a11));
+    a[11] = -(a00 * (a11 * a23 - a13 * a21) - a10 * (a01 * a23 - a03 * a21) + a20 * (a01 * a13 - a03 * a11));
+    a[12] = -(a10 * (a21 * a32 - a22 * a31) - a20 * (a11 * a32 - a12 * a31) + a30 * (a11 * a22 - a12 * a21));
+    a[13] =  (a00 * (a21 * a32 - a22 * a31) - a20 * (a01 * a32 - a02 * a31) + a30 * (a01 * a22 - a02 * a21));
+    a[14] = -(a00 * (a11 * a32 - a12 * a31) - a10 * (a01 * a32 - a02 * a31) + a30 * (a01 * a12 - a02 * a11));
+    a[15] =  (a00 * (a11 * a22 - a12 * a21) - a10 * (a01 * a22 - a02 * a21) + a20 * (a01 * a12 - a02 * a11));
+    return this;
+};
+
+mat4.determinant = function () {
+    var a = this.val,
+        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15],
+
+        b00 = a00 * a11 - a01 * a10,
+        b01 = a00 * a12 - a02 * a10,
+        b02 = a00 * a13 - a03 * a10,
+        b03 = a01 * a12 - a02 * a11,
+        b04 = a01 * a13 - a03 * a11,
+        b05 = a02 * a13 - a03 * a12,
+        b06 = a20 * a31 - a21 * a30,
+        b07 = a20 * a32 - a22 * a30,
+        b08 = a20 * a33 - a23 * a30,
+        b09 = a21 * a32 - a22 * a31,
+        b10 = a21 * a33 - a23 * a31,
+        b11 = a22 * a33 - a23 * a32;
+
+    // Calculate the determinant
+    return b00 * b11 - b01 * b10 + b02 * b09 + b03 * b08 - b04 * b07 + b05 * b06;
+};
+
+mat4.multiply = function(otherMat) {
+    var a = this.val,
+        b = otherMat.val,
+        a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3],
+        a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7],
+        a20 = a[8], a21 = a[9], a22 = a[10], a23 = a[11],
+        a30 = a[12], a31 = a[13], a32 = a[14], a33 = a[15];
+
+    // Cache only the current line of the second matrix
+    var b0  = b[0], b1 = b[1], b2 = b[2], b3 = b[3];  
+    a[0] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+    a[1] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+    a[2] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+    a[3] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+
+    b0 = b[4]; b1 = b[5]; b2 = b[6]; b3 = b[7];
+    a[4] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+    a[5] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+    a[6] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+    a[7] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+
+    b0 = b[8]; b1 = b[9]; b2 = b[10]; b3 = b[11];
+    a[8] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+    a[9] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+    a[10] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+    a[11] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+
+    b0 = b[12]; b1 = b[13]; b2 = b[14]; b3 = b[15];
+    a[12] = b0*a00 + b1*a10 + b2*a20 + b3*a30;
+    a[13] = b0*a01 + b1*a11 + b2*a21 + b3*a31;
+    a[14] = b0*a02 + b1*a12 + b2*a22 + b3*a32;
+    a[15] = b0*a03 + b1*a13 + b2*a23 + b3*a33;
+    return this;
+};
+
+mat4.translate = function(v) {
+    var x = v.x, y = v.y, z = v.z,
+        a = this.val;
+    a[12] = a[0] * x + a[4] * y + a[8] * z + a[12];
+    a[13] = a[1] * x + a[5] * y + a[9] * z + a[13];
+    a[14] = a[2] * x + a[6] * y + a[10] * z + a[14];
+    a[15] = a[3] * x + a[7] * y + a[11] * z + a[15];
+    return this;
+};
+
+mat4.scale = function(v) {
+    var x = v.x, y = v.y, z = v.z, a = this.val;
+
+    a[0] = a[0] * x;
+    a[1] = a[1] * x;
+    a[2] = a[2] * x;
+    a[3] = a[3] * x;
+    a[4] = a[4] * y;
+    a[5] = a[5] * y;
+    a[6] = a[6] * y;
+    a[7] = a[7] * y;
+    a[8] = a[8] * z;
+    a[9] = a[9] * z;
+    a[10] = a[10] * z;
+    a[11] = a[11] * z;
+    a[12] = a[12];
+    a[13] = a[13];
+    a[14] = a[14];
+    a[15] = a[15];
+    return this;
+};
+
+mat4.rotate = function (rad, axis) {
+    var a = this.val,
+        x = axis.x, y = axis.y, z = axis.z,
+        len = Math.sqrt(x * x + y * y + z * z),
+        s, c, t,
+        a00, a01, a02, a03,
+        a10, a11, a12, a13,
+        a20, a21, a22, a23,
+        b00, b01, b02,
+        b10, b11, b12,
+        b20, b21, b22;
+
+    if (Math.abs(len) < EPSILON) { return null; }
+    
+    len = 1 / len;
+    x *= len;
+    y *= len;
+    z *= len;
+
+    s = Math.sin(rad);
+    c = Math.cos(rad);
+    t = 1 - c;
+
+    a00 = a[0]; a01 = a[1]; a02 = a[2]; a03 = a[3];
+    a10 = a[4]; a11 = a[5]; a12 = a[6]; a13 = a[7];
+    a20 = a[8]; a21 = a[9]; a22 = a[10]; a23 = a[11];
+
+    // Construct the elements of the rotation matrix
+    b00 = x * x * t + c; b01 = y * x * t + z * s; b02 = z * x * t - y * s;
+    b10 = x * y * t - z * s; b11 = y * y * t + c; b12 = z * y * t + x * s;
+    b20 = x * z * t + y * s; b21 = y * z * t - x * s; b22 = z * z * t + c;
+
+    // Perform rotation-specific matrix multiplication
+    a[0] = a00 * b00 + a10 * b01 + a20 * b02;
+    a[1] = a01 * b00 + a11 * b01 + a21 * b02;
+    a[2] = a02 * b00 + a12 * b01 + a22 * b02;
+    a[3] = a03 * b00 + a13 * b01 + a23 * b02;
+    a[4] = a00 * b10 + a10 * b11 + a20 * b12;
+    a[5] = a01 * b10 + a11 * b11 + a21 * b12;
+    a[6] = a02 * b10 + a12 * b11 + a22 * b12;
+    a[7] = a03 * b10 + a13 * b11 + a23 * b12;
+    a[8] = a00 * b20 + a10 * b21 + a20 * b22;
+    a[9] = a01 * b20 + a11 * b21 + a21 * b22;
+    a[10] = a02 * b20 + a12 * b21 + a22 * b22;
+    a[11] = a03 * b20 + a13 * b21 + a23 * b22;
+    return this;
+};
+
+mat4.rotateX = function(rad) {
+    var a = this.val,
+        s = Math.sin(rad),
+        c = Math.cos(rad),
+        a10 = a[4],
+        a11 = a[5],
+        a12 = a[6],
+        a13 = a[7],
+        a20 = a[8],
+        a21 = a[9],
+        a22 = a[10],
+        a23 = a[11];
+
+    // Perform axis-specific matrix multiplication
+    a[4] = a10 * c + a20 * s;
+    a[5] = a11 * c + a21 * s;
+    a[6] = a12 * c + a22 * s;
+    a[7] = a13 * c + a23 * s;
+    a[8] = a20 * c - a10 * s;
+    a[9] = a21 * c - a11 * s;
+    a[10] = a22 * c - a12 * s;
+    a[11] = a23 * c - a13 * s;
+    return this;
+};
+
+mat4.rotateY = function(rad) {
+    var a = this.val,
+        s = Math.sin(rad),
+        c = Math.cos(rad),
+        a00 = a[0],
+        a01 = a[1],
+        a02 = a[2],
+        a03 = a[3],
+        a20 = a[8],
+        a21 = a[9],
+        a22 = a[10],
+        a23 = a[11];
+
+    // Perform axis-specific matrix multiplication
+    a[0] = a00 * c - a20 * s;
+    a[1] = a01 * c - a21 * s;
+    a[2] = a02 * c - a22 * s;
+    a[3] = a03 * c - a23 * s;
+    a[8] = a00 * s + a20 * c;
+    a[9] = a01 * s + a21 * c;
+    a[10] = a02 * s + a22 * c;
+    a[11] = a03 * s + a23 * c;
+    return this;
+};
+
+mat4.rotateZ = function (rad) {
+    var a = this.val,
+        s = Math.sin(rad),
+        c = Math.cos(rad),
+        a00 = a[0],
+        a01 = a[1],
+        a02 = a[2],
+        a03 = a[3],
+        a10 = a[4],
+        a11 = a[5],
+        a12 = a[6],
+        a13 = a[7];
+
+    // Perform axis-specific matrix multiplication
+    a[0] = a00 * c + a10 * s;
+    a[1] = a01 * c + a11 * s;
+    a[2] = a02 * c + a12 * s;
+    a[3] = a03 * c + a13 * s;
+    a[4] = a10 * c - a00 * s;
+    a[5] = a11 * c - a01 * s;
+    a[6] = a12 * c - a02 * s;
+    a[7] = a13 * c - a03 * s;
+    return this;
+};
+
+mat4.fromRotationTranslation = function (q, v) {
+    // Quaternion math
+    var out = this.val,
+        x = q.x, y = q.y, z = q.z, w = q.w,
+        x2 = x + x,
+        y2 = y + y,
+        z2 = z + z,
+
+        xx = x * x2,
+        xy = x * y2,
+        xz = x * z2,
+        yy = y * y2,
+        yz = y * z2,
+        zz = z * z2,
+        wx = w * x2,
+        wy = w * y2,
+        wz = w * z2;
+
+    out[0] = 1 - (yy + zz);
+    out[1] = xy + wz;
+    out[2] = xz - wy;
+    out[3] = 0;
+    out[4] = xy - wz;
+    out[5] = 1 - (xx + zz);
+    out[6] = yz + wx;
+    out[7] = 0;
+    out[8] = xz + wy;
+    out[9] = yz - wx;
+    out[10] = 1 - (xx + yy);
+    out[11] = 0;
+    out[12] = v.x;
+    out[13] = v.y;
+    out[14] = v.z;
+    out[15] = 1;
+    return this;
+};
+
+mat4.fromQuat = function (q) {
+    var out = this.val,
+        x = q.x, y = q.y, z = q.z, w = q.w,
+        x2 = x + x,
+        y2 = y + y,
+        z2 = z + z,
+
+        xx = x * x2,
+        xy = x * y2,
+        xz = x * z2,
+        yy = y * y2,
+        yz = y * z2,
+        zz = z * z2,
+        wx = w * x2,
+        wy = w * y2,
+        wz = w * z2;
+
+    out[0] = 1 - (yy + zz);
+    out[1] = xy + wz;
+    out[2] = xz - wy;
+    out[3] = 0;
+
+    out[4] = xy - wz;
+    out[5] = 1 - (xx + zz);
+    out[6] = yz + wx;
+    out[7] = 0;
+
+    out[8] = xz + wy;
+    out[9] = yz - wx;
+    out[10] = 1 - (xx + yy);
+    out[11] = 0;
+
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = 0;
+    out[15] = 1;
+
+    return this;
+};
+
+
+/**
+ * Generates a frustum matrix with the given bounds
+ *
+ * @param {Number} left Left bound of the frustum
+ * @param {Number} right Right bound of the frustum
+ * @param {Number} bottom Bottom bound of the frustum
+ * @param {Number} top Top bound of the frustum
+ * @param {Number} near Near bound of the frustum
+ * @param {Number} far Far bound of the frustum
+ * @returns {Matrix4} this for chaining
+ */
+mat4.frustum = function (left, right, bottom, top, near, far) {
+    var out = this.val,
+        rl = 1 / (right - left),
+        tb = 1 / (top - bottom),
+        nf = 1 / (near - far);
+    out[0] = (near * 2) * rl;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = (near * 2) * tb;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = (right + left) * rl;
+    out[9] = (top + bottom) * tb;
+    out[10] = (far + near) * nf;
+    out[11] = -1;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = (far * near * 2) * nf;
+    out[15] = 0;
+    return this;
+};
+
+
+/**
+ * Generates a perspective projection matrix with the given bounds
+ *
+ * @param {number} fovy Vertical field of view in radians
+ * @param {number} aspect Aspect ratio. typically viewport width/height
+ * @param {number} near Near bound of the frustum
+ * @param {number} far Far bound of the frustum
+ * @returns {Matrix4} this for chaining
+ */
+mat4.perspective = function (fovy, aspect, near, far) {
+    var out = this.val,
+        f = 1.0 / Math.tan(fovy / 2),
+        nf = 1 / (near - far);
+    out[0] = f / aspect;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = f;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = (far + near) * nf;
+    out[11] = -1;
+    out[12] = 0;
+    out[13] = 0;
+    out[14] = (2 * far * near) * nf;
+    out[15] = 0;
+    return this;
+};
+
+/**
+ * Generates a orthogonal projection matrix with the given bounds
+ *
+ * @param {number} left Left bound of the frustum
+ * @param {number} right Right bound of the frustum
+ * @param {number} bottom Bottom bound of the frustum
+ * @param {number} top Top bound of the frustum
+ * @param {number} near Near bound of the frustum
+ * @param {number} far Far bound of the frustum
+ * @returns {Matrix4} this for chaining
+ */
+mat4.ortho = function (left, right, bottom, top, near, far) {
+    var out = this.val,
+        lr = 1 / (left - right),
+        bt = 1 / (bottom - top),
+        nf = 1 / (near - far);
+    out[0] = -2 * lr;
+    out[1] = 0;
+    out[2] = 0;
+    out[3] = 0;
+    out[4] = 0;
+    out[5] = -2 * bt;
+    out[6] = 0;
+    out[7] = 0;
+    out[8] = 0;
+    out[9] = 0;
+    out[10] = 2 * nf;
+    out[11] = 0;
+    out[12] = (left + right) * lr;
+    out[13] = (top + bottom) * bt;
+    out[14] = (far + near) * nf;
+    out[15] = 1;
+    return this;
+};
+
+/**
+ * Generates a look-at matrix with the given eye position, focal point, and up axis
+ *
+ * @param {Vector3} eye Position of the viewer
+ * @param {Vector3} center Point the viewer is looking at
+ * @param {Vector3} up vec3 pointing up
+ * @returns {Matrix4} this for chaining
+ */
+mat4.lookAt = function (eye, center, up) {
+    var out = this.val,
+
+        x0, x1, x2, y0, y1, y2, z0, z1, z2, len,
+        eyex = eye.x,
+        eyey = eye.y,
+        eyez = eye.z,
+        upx = up.x,
+        upy = up.y,
+        upz = up.z,
+        centerx = center.x,
+        centery = center.y,
+        centerz = center.z;
+
+    if (Math.abs(eyex - centerx) < EPSILON &&
+        Math.abs(eyey - centery) < EPSILON &&
+        Math.abs(eyez - centerz) < EPSILON) {
+        return this.identity();
+    }
+
+    z0 = eyex - centerx;
+    z1 = eyey - centery;
+    z2 = eyez - centerz;
+
+    len = 1 / Math.sqrt(z0 * z0 + z1 * z1 + z2 * z2);
+    z0 *= len;
+    z1 *= len;
+    z2 *= len;
+
+    x0 = upy * z2 - upz * z1;
+    x1 = upz * z0 - upx * z2;
+    x2 = upx * z1 - upy * z0;
+    len = Math.sqrt(x0 * x0 + x1 * x1 + x2 * x2);
+    if (!len) {
+        x0 = 0;
+        x1 = 0;
+        x2 = 0;
+    } else {
+        len = 1 / len;
+        x0 *= len;
+        x1 *= len;
+        x2 *= len;
+    }
+
+    y0 = z1 * x2 - z2 * x1;
+    y1 = z2 * x0 - z0 * x2;
+    y2 = z0 * x1 - z1 * x0;
+
+    len = Math.sqrt(y0 * y0 + y1 * y1 + y2 * y2);
+    if (!len) {
+        y0 = 0;
+        y1 = 0;
+        y2 = 0;
+    } else {
+        len = 1 / len;
+        y0 *= len;
+        y1 *= len;
+        y2 *= len;
+    }
+
+    out[0] = x0;
+    out[1] = y0;
+    out[2] = z0;
+    out[3] = 0;
+    out[4] = x1;
+    out[5] = y1;
+    out[6] = z1;
+    out[7] = 0;
+    out[8] = x2;
+    out[9] = y2;
+    out[10] = z2;
+    out[11] = 0;
+    out[12] = -(x0 * eyex + x1 * eyey + x2 * eyez);
+    out[13] = -(y0 * eyex + y1 * eyey + y2 * eyez);
+    out[14] = -(z0 * eyex + z1 * eyey + z2 * eyez);
+    out[15] = 1;
+
+    return this;
+};
+
+
+mat4.mul = mat4.multiply;
+
+mat4.idt = mat4.identity;
+
+//This is handy for Pool utilities, to "reset" a
+//shared object to its default state
+mat4.reset = mat4.idt;
+
+mat4.toString = function () {
+    var a = this.val;
+    return 'Matrix4(' + a[0] + ', ' + a[1] + ', ' + a[2] + ', ' + a[3] + ', ' +
+                    a[4] + ', ' + a[5] + ', ' + a[6] + ', ' + a[7] + ', ' +
+                    a[8] + ', ' + a[9] + ', ' + a[10] + ', ' + a[11] + ', ' + 
+                    a[12] + ', ' + a[13] + ', ' + a[14] + ', ' + a[15] + ')';
+};
+
+mat4.str = mat4.toString;
+
+module.exports = Matrix4;
+
+},{}],32:[function(require,module,exports){
+var Vector3 = require('./Vector3');
+var Matrix3 = require('./Matrix3');
+var common = require('./common');
+
+//some shared 'private' arrays
+var s_iNext = (typeof Int8Array !== 'undefined' ? new Int8Array([1,2,0]) : [1,2,0]);
+var tmp = (typeof Float32Array !== 'undefined' ? new Float32Array([0,0,0]) : [0,0,0]);
+
+var xUnitVec3 = new Vector3(1, 0, 0);
+var yUnitVec3 = new Vector3(0, 1, 0);
+var tmpvec = new Vector3();
+
+var tmpMat3 = new Matrix3();
+
+function Quaternion(x, y, z, w) {
+	if (typeof x === "object") {
+        this.x = x.x||0;
+        this.y = x.y||0;
+        this.z = x.z||0;
+        this.w = x.w||0;
+    } else {
+        this.x = x||0;
+        this.y = y||0;
+        this.z = z||0;
+        this.w = w||0;
+    }
+}
+
+var quat = Quaternion.prototype;
+
+//mixin common functions
+for (var k in common) {
+    quat[k] = common[k];
+}
+
+quat.rotationTo = function(a, b) {
+    var dot = a.x * b.x + a.y * b.y + a.z * b.z; //a.dot(b)
+    if (dot < -0.999999) {
+        if (tmpvec.copy(xUnitVec3).cross(a).len() < 0.000001)
+            tmpvec.copy(yUnitVec3).cross(a);
+        
+        tmpvec.normalize();
+        return this.setAxisAngle(tmpvec, Math.PI);
+    } else if (dot > 0.999999) {
+        this.x = 0;
+        this.y = 0;
+        this.z = 0;
+        this.w = 1;
+        return this;
+    } else {
+        tmpvec.copy(a).cross(b);
+        this.x = tmpvec.x;
+        this.y = tmpvec.y;
+        this.z = tmpvec.z;
+        this.w = 1 + dot;
+        return this.normalize();
+    }
+};
+
+quat.setAxes = function(view, right, up) {
+    var m = tmpMat3.val;
+    m[0] = right.x;
+    m[3] = right.y;
+    m[6] = right.z;
+
+    m[1] = up.x;
+    m[4] = up.y;
+    m[7] = up.z;
+
+    m[2] = -view.x;
+    m[5] = -view.y;
+    m[8] = -view.z;
+
+    return this.fromMat3(tmpMat3).normalize();
+};
+
+quat.identity = function() {
+    this.x = this.y = this.z = 0;
+    this.w = 1;
+    return this;
+};
+
+quat.setAxisAngle = function(axis, rad) {
+    rad = rad * 0.5;
+    var s = Math.sin(rad);
+    this.x = s * axis.x;
+    this.y = s * axis.y;
+    this.z = s * axis.z;
+    this.w = Math.cos(rad);
+    return this;
+};
+
+quat.multiply = function(b) {
+    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
+        bx = b.x, by = b.y, bz = b.z, bw = b.w;
+
+    this.x = ax * bw + aw * bx + ay * bz - az * by;
+    this.y = ay * bw + aw * by + az * bx - ax * bz;
+    this.z = az * bw + aw * bz + ax * by - ay * bx;
+    this.w = aw * bw - ax * bx - ay * by - az * bz;
+    return this;
+};
+
+quat.slerp = function (b, t) {
+    // benchmarks:
+    //    http://jsperf.com/quaternion-slerp-implementations
+
+    var ax = this.x, ay = this.y, az = this.y, aw = this.y,
+        bx = b.x, by = b.y, bz = b.z, bw = b.w;
+
+    var        omega, cosom, sinom, scale0, scale1;
+
+    // calc cosine
+    cosom = ax * bx + ay * by + az * bz + aw * bw;
+    // adjust signs (if necessary)
+    if ( cosom < 0.0 ) {
+        cosom = -cosom;
+        bx = - bx;
+        by = - by;
+        bz = - bz;
+        bw = - bw;
+    }
+    // calculate coefficients
+    if ( (1.0 - cosom) > 0.000001 ) {
+        // standard case (slerp)
+        omega  = Math.acos(cosom);
+        sinom  = Math.sin(omega);
+        scale0 = Math.sin((1.0 - t) * omega) / sinom;
+        scale1 = Math.sin(t * omega) / sinom;
+    } else {        
+        // "from" and "to" quaternions are very close 
+        //  ... so we can do a linear interpolation
+        scale0 = 1.0 - t;
+        scale1 = t;
+    }
+    // calculate final values
+    this.x = scale0 * ax + scale1 * bx;
+    this.y = scale0 * ay + scale1 * by;
+    this.z = scale0 * az + scale1 * bz;
+    this.w = scale0 * aw + scale1 * bw;
+    return this;
+};
+
+quat.invert = function() {
+    var a0 = this.x, a1 = this.y, a2 = this.z, a3 = this.w,
+        dot = a0*a0 + a1*a1 + a2*a2 + a3*a3,
+        invDot = dot ? 1.0/dot : 0;
+    
+    // TODO: Would be faster to return [0,0,0,0] immediately if dot == 0
+
+    this.x = -a0*invDot;
+    this.y = -a1*invDot;
+    this.z = -a2*invDot;
+    this.w = a3*invDot;
+    return this;
+};
+
+quat.conjugate = function() {
+    this.x = -this.x;
+    this.y = -this.y;
+    this.z = -this.z;
+    return this;
+};
+
+quat.rotateX = function (rad) {
+    rad *= 0.5; 
+
+    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
+        bx = Math.sin(rad), bw = Math.cos(rad);
+
+    this.x = ax * bw + aw * bx;
+    this.y = ay * bw + az * bx;
+    this.z = az * bw - ay * bx;
+    this.w = aw * bw - ax * bx;
+    return this;
+};
+
+quat.rotateY = function (rad) {
+    rad *= 0.5; 
+
+    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
+        by = Math.sin(rad), bw = Math.cos(rad);
+
+    this.x = ax * bw - az * by;
+    this.y = ay * bw + aw * by;
+    this.z = az * bw + ax * by;
+    this.w = aw * bw - ay * by;
+    return this;
+};
+
+quat.rotateZ = function (rad) {
+    rad *= 0.5; 
+
+    var ax = this.x, ay = this.y, az = this.z, aw = this.w,
+        bz = Math.sin(rad), bw = Math.cos(rad);
+
+    this.x = ax * bw + ay * bz;
+    this.y = ay * bw - ax * bz;
+    this.z = az * bw + aw * bz;
+    this.w = aw * bw - az * bz;
+    return this;
+};
+
+quat.calculateW = function () {
+    var x = this.x, y = this.y, z = this.z;
+
+    this.x = x;
+    this.y = y;
+    this.z = z;
+    this.w = -Math.sqrt(Math.abs(1.0 - x * x - y * y - z * z));
+    return this;
+};
+
+quat.fromMat3 = function(mat) {
+    // benchmarks:
+    //    http://jsperf.com/typed-array-access-speed
+    //    http://jsperf.com/conversion-of-3x3-matrix-to-quaternion
+
+    // Algorithm in Ken Shoemake's article in 1987 SIGGRAPH course notes
+    // article "Quaternion Calculus and Fast Animation".
+    var m = mat.val,
+        fTrace = m[0] + m[4] + m[8];
+    var fRoot;
+
+    if ( fTrace > 0.0 ) {
+        // |w| > 1/2, may as well choose w > 1/2
+        fRoot = Math.sqrt(fTrace + 1.0);  // 2w
+        this.w = 0.5 * fRoot;
+        fRoot = 0.5/fRoot;  // 1/(4w)
+        this.x = (m[7]-m[5])*fRoot;
+        this.y = (m[2]-m[6])*fRoot;
+        this.z = (m[3]-m[1])*fRoot;
+    } else {
+        // |w| <= 1/2
+        var i = 0;
+        if ( m[4] > m[0] )
+          i = 1;
+        if ( m[8] > m[i*3+i] )
+          i = 2;
+        var j = s_iNext[i];
+        var k = s_iNext[j];
+            
+        //This isn't quite as clean without array access...
+        fRoot = Math.sqrt(m[i*3+i]-m[j*3+j]-m[k*3+k] + 1.0);
+        tmp[i] = 0.5 * fRoot;
+
+        fRoot = 0.5 / fRoot;
+        tmp[j] = (m[j*3+i] + m[i*3+j]) * fRoot;
+        tmp[k] = (m[k*3+i] + m[i*3+k]) * fRoot;
+
+        this.x = tmp[0];
+        this.y = tmp[1];
+        this.z = tmp[2];
+        this.w = (m[k*3+j] - m[j*3+k]) * fRoot;
+    }
+    
+    return this;
+};
+
+quat.idt = quat.identity;
+
+quat.sub = quat.subtract;
+
+quat.mul = quat.multiply;
+
+quat.len = quat.length;
+
+quat.lenSq = quat.lengthSq;
+
+//This is handy for Pool utilities, to "reset" a
+//shared object to its default state
+quat.reset = quat.idt;
+
+
+quat.toString = function() {
+    return 'Quaternion(' + this.x + ', ' + this.y + ', ' + this.z + ', ' + this.w + ')';
+};
+
+quat.str = quat.toString;
+
+module.exports = Quaternion;
+},{"./Matrix3":30,"./Vector3":34,"./common":36}],33:[function(require,module,exports){
+function Vector2(x, y) {
+	if (typeof x === "object") {
+        this.x = x.x||0;
+        this.y = x.y||0;
+    } else {
+        this.x = x||0;
+        this.y = y||0;
+    }
+}
+
+//shorthand it for better minification
+var vec2 = Vector2.prototype;
+
+/**
+ * Returns a new instance of Vector2 with
+ * this vector's components. 
+ * @return {Vector2} a clone of this vector
+ */
+vec2.clone = function() {
+    return new Vector2(this.x, this.y);
+};
+
+/**
+ * Copies the x, y components from the specified
+ * Vector. Any undefined components from `otherVec`
+ * will default to zero.
+ * 
+ * @param  {otherVec} the other Vector2 to copy
+ * @return {Vector2}  this, for chaining
+ */
+vec2.copy = function(otherVec) {
+    this.x = otherVec.x||0;
+    this.y = otherVec.y||0;
+    return this;
+};
+
+/**
+ * A convenience function to set the components of
+ * this vector as x and y. Falsy or undefined
+ * parameters will default to zero.
+ *
+ * You can also pass a vector object instead of
+ * individual components, to copy the object's components.
+ * 
+ * @param {Number} x the x component
+ * @param {Number} y the y component
+ * @return {Vector2}  this, for chaining
+ */
+vec2.set = function(x, y) {
+    if (typeof x === "object") {
+        this.x = x.x||0;
+        this.y = x.y||0;
+    } else {
+        this.x = x||0;
+        this.y = y||0;
+    }
+    return this;
+};
+
+vec2.add = function(v) {
+    this.x += v.x;
+    this.y += v.y;
+    return this;
+};
+
+vec2.subtract = function(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    return this;
+};
+
+vec2.multiply = function(v) {
+    this.x *= v.x;
+    this.y *= v.y;
+    return this;
+};
+
+vec2.scale = function(s) {
+    this.x *= s;
+    this.y *= s;
+    return this;
+};
+
+vec2.divide = function(v) {
+    this.x /= v.x;
+    this.y /= v.y;
+    return this;
+};
+
+vec2.negate = function() {
+    this.x = -this.x;
+    this.y = -this.y;
+    return this;
+};
+
+vec2.distance = function(v) {
+    var dx = v.x - this.x,
+        dy = v.y - this.y;
+    return Math.sqrt(dx*dx + dy*dy);
+};
+
+vec2.distanceSq = function(v) {
+    var dx = v.x - this.x,
+        dy = v.y - this.y;
+    return dx*dx + dy*dy;
+};
+
+vec2.length = function() {
+    var x = this.x,
+        y = this.y;
+    return Math.sqrt(x*x + y*y);
+};
+
+vec2.lengthSq = function() {
+    var x = this.x,
+        y = this.y;
+    return x*x + y*y;
+};
+
+vec2.normalize = function() {
+    var x = this.x,
+        y = this.y;
+    var len = x*x + y*y;
+    if (len > 0) {
+        len = 1 / Math.sqrt(len);
+        this.x = x*len;
+        this.y = y*len;
+    }
+    return this;
+};
+
+vec2.dot = function(v) {
+    return this.x * v.x + this.y * v.y;
+};
+
+//Unlike Vector3, this returns a scalar
+//http://allenchou.net/2013/07/cross-product-of-2d-vectors/
+vec2.cross = function(v) {
+    return this.x * v.y - this.y * v.x;
+};
+
+vec2.lerp = function(v, t) {
+    var ax = this.x,
+        ay = this.y;
+    t = t||0;
+    this.x = ax + t * (v.x - ax);
+    this.y = ay + t * (v.y - ay);
+    return this;
+};
+
+vec2.transformMat3 = function(mat) {
+    var x = this.x, y = this.y, m = mat.val;
+    this.x = m[0] * x + m[3] * y + m[6];
+    this.y = m[1] * x + m[4] * y + m[7];
+    return this;
+};
+
+vec2.transformMat4 = function(mat) {
+    var x = this.x, 
+        y = this.y,
+        m = mat.val;
+    this.x = m[0] * x + m[4] * y + m[12];
+    this.y = m[1] * x + m[5] * y + m[13];
+    return this;
+};
+
+vec2.reset = function() {
+    this.x = 0;
+    this.y = 0;
+    return this;
+};
+
+vec2.sub = vec2.subtract;
+
+vec2.mul = vec2.multiply;
+
+vec2.div = vec2.divide;
+
+vec2.dist = vec2.distance;
+
+vec2.distSq = vec2.distanceSq;
+
+vec2.len = vec2.length;
+
+vec2.lenSq = vec2.lengthSq;
+
+vec2.toString = function() {
+    return 'Vector2(' + this.x + ', ' + this.y + ')';
+};
+
+vec2.random = function(scale) {
+    scale = scale || 1.0;
+    var r = Math.random() * 2.0 * Math.PI;
+    this.x = Math.cos(r) * scale;
+    this.y = Math.sin(r) * scale;
+    return this;
+};
+
+vec2.str = vec2.toString;
+
+module.exports = Vector2;
+},{}],34:[function(require,module,exports){
+function Vector3(x, y, z) {
+    if (typeof x === "object") {
+        this.x = x.x||0;
+        this.y = x.y||0;
+        this.z = x.z||0;
+    } else {
+        this.x = x||0;
+        this.y = y||0;
+        this.z = z||0;
+    }
+}
+
+//shorthand it for better minification
+var vec3 = Vector3.prototype;
+
+vec3.clone = function() {
+    return new Vector3(this.x, this.y, this.z);
+};
+
+vec3.copy = function(otherVec) {
+    this.x = otherVec.x;
+    this.y = otherVec.y;
+    this.z = otherVec.z;
+    return this;
+};
+
+vec3.set = function(x, y, z) {
+    if (typeof x === "object") {
+        this.x = x.x||0;
+        this.y = x.y||0;
+        this.z = x.z||0;
+    } else {
+        this.x = x||0;
+        this.y = y||0;
+        this.z = z||0;
+    }
+    return this;
+};
+
+vec3.add = function(v) {
+    this.x += v.x;
+    this.y += v.y;
+    this.z += v.z;
+    return this;
+};
+
+vec3.subtract = function(v) {
+    this.x -= v.x;
+    this.y -= v.y;
+    this.z -= v.z;
+    return this;
+};
+
+vec3.multiply = function(v) {
+    this.x *= v.x;
+    this.y *= v.y;
+    this.z *= v.z;
+    return this;
+};
+
+vec3.scale = function(s) {
+    this.x *= s;
+    this.y *= s;
+    this.z *= s;
+    return this;
+};
+
+vec3.divide = function(v) {
+    this.x /= v.x;
+    this.y /= v.y;
+    this.z /= v.z;
+    return this;
+};
+
+vec3.negate = function() {
+    this.x = -this.x;
+    this.y = -this.y;
+    this.z = -this.z;
+    return this;
+};
+
+vec3.distance = function(v) {
+    var dx = v.x - this.x,
+        dy = v.y - this.y,
+        dz = v.z - this.z;
+    return Math.sqrt(dx*dx + dy*dy + dz*dz);
+};
+
+vec3.distanceSq = function(v) {
+    var dx = v.x - this.x,
+        dy = v.y - this.y,
+        dz = v.z - this.z;
+    return dx*dx + dy*dy + dz*dz;
+};
+
+vec3.length = function() {
+    var x = this.x,
+        y = this.y,
+        z = this.z;
+    return Math.sqrt(x*x + y*y + z*z);
+};
+
+vec3.lengthSq = function() {
+    var x = this.x,
+        y = this.y,
+        z = this.z;
+    return x*x + y*y + z*z;
+};
+
+vec3.normalize = function() {
+    var x = this.x,
+        y = this.y,
+        z = this.z;
+    var len = x*x + y*y + z*z;
+    if (len > 0) {
+        len = 1 / Math.sqrt(len);
+        this.x = x*len;
+        this.y = y*len;
+        this.z = z*len;
+    }
+    return this;
+};
+
+vec3.dot = function(v) {
+    return this.x * v.x + this.y * v.y + this.z * v.z;
+};
+
+vec3.cross = function(v) {
+    var ax = this.x, ay = this.y, az = this.z,
+        bx = v.x, by = v.y, bz = v.z;
+
+    this.x = ay * bz - az * by;
+    this.y = az * bx - ax * bz;
+    this.z = ax * by - ay * bx;
+    return this;
+};
+
+vec3.lerp = function(v, t) {
+    var ax = this.x,
+        ay = this.y,
+        az = this.z;
+    t = t||0;
+    this.x = ax + t * (v.x - ax);
+    this.y = ay + t * (v.y - ay);
+    this.z = az + t * (v.z - az);
+    return this;
+};
+
+vec3.transformMat4 = function(mat) {
+    var x = this.x, y = this.y, z = this.z, m = mat.val;
+    this.x = m[0] * x + m[4] * y + m[8] * z + m[12];
+    this.y = m[1] * x + m[5] * y + m[9] * z + m[13];
+    this.z = m[2] * x + m[6] * y + m[10] * z + m[14];
+    return this;
+};
+
+vec3.transformMat3 = function(mat) {
+    var x = this.x, y = this.y, z = this.z, m = mat.val;
+    this.x = x * m[0] + y * m[3] + z * m[6];
+    this.y = x * m[1] + y * m[4] + z * m[7];
+    this.z = x * m[2] + y * m[5] + z * m[8];
+    return this;
+};
+
+vec3.transformQuat = function(q) {
+    // benchmarks: http://jsperf.com/quaternion-transform-vec3-implementations
+    var x = this.x, y = this.y, z = this.z,
+        qx = q.x, qy = q.y, qz = q.z, qw = q.w,
+
+        // calculate quat * vec
+        ix = qw * x + qy * z - qz * y,
+        iy = qw * y + qz * x - qx * z,
+        iz = qw * z + qx * y - qy * x,
+        iw = -qx * x - qy * y - qz * z;
+
+    // calculate result * inverse quat
+    this.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+    this.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+    this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+    return this;
+};
+
+/**
+ * Multiplies this Vector3 by the specified matrix, 
+ * applying a W divide. This is useful for projection,
+ * e.g. unprojecting a 2D point into 3D space.
+ *
+ * @method  prj
+ * @param {Matrix4} the 4x4 matrix to multiply with 
+ * @return {Vector3} this object for chaining
+ */
+vec3.project = function(mat) {
+    var x = this.x,
+        y = this.y,
+        z = this.z,
+        m = mat.val,
+        a00 = m[0], a01 = m[1], a02 = m[2], a03 = m[3],
+        a10 = m[4], a11 = m[5], a12 = m[6], a13 = m[7],
+        a20 = m[8], a21 = m[9], a22 = m[10], a23 = m[11],
+        a30 = m[12], a31 = m[13], a32 = m[14], a33 = m[15];
+
+    var l_w = 1 / (x * a03 + y * a13 + z * a23 + a33);
+
+    this.x = (x * a00 + y * a10 + z * a20 + a30) * l_w; 
+    this.y = (x * a01 + y * a11 + z * a21 + a31) * l_w; 
+    this.z = (x * a02 + y * a12 + z * a22 + a32) * l_w;
+    return this;
+};
+
+/**
+ * Unproject this point from 2D space to 3D space.
+ * The point should have its x and y properties set to
+ * 2D screen space, and the z either at 0 (near plane)
+ * or 1 (far plane). The provided matrix is assumed to already
+ * be combined, i.e. projection * view * model.
+ *
+ * After this operation, this vector's (x, y, z) components will
+ * represent the unprojected 3D coordinate.
+ * 
+ * @param  {Vector4} viewport          screen x, y, width and height in pixels
+ * @param  {Matrix4} invProjectionView combined projection and view matrix
+ * @return {Vector3}                   this object, for chaining
+ */
+vec3.unproject = function(viewport, invProjectionView) {
+    var viewX = viewport.x,
+        viewY = viewport.y,
+        viewWidth = viewport.z,
+        viewHeight = viewport.w;
+    
+    var x = this.x, 
+        y = this.y,
+        z = this.z;
+
+    x = x - viewX;
+    y = viewHeight - y - 1;
+    y = y - viewY;
+
+    this.x = (2 * x) / viewWidth - 1;
+    this.y = (2 * y) / viewHeight - 1;
+    this.z = 2 * z - 1;
+
+    return this.project(invProjectionView);
+};
+
+vec3.random = function(scale) {
+    scale = scale || 1.0;
+
+    var r = Math.random() * 2.0 * Math.PI;
+    var z = (Math.random() * 2.0) - 1.0;
+    var zScale = Math.sqrt(1.0-z*z) * scale;
+    
+    this.x = Math.cos(r) * zScale;
+    this.y = Math.sin(r) * zScale;
+    this.z = z * scale;
+    return this;
+};
+
+vec3.reset = function() {
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    return this;
+};
+
+
+vec3.sub = vec3.subtract;
+
+vec3.mul = vec3.multiply;
+
+vec3.div = vec3.divide;
+
+vec3.dist = vec3.distance;
+
+vec3.distSq = vec3.distanceSq;
+
+vec3.len = vec3.length;
+
+vec3.lenSq = vec3.lengthSq;
+
+vec3.toString = function() {
+    return 'Vector3(' + this.x + ', ' + this.y + ', ' + this.z + ')';
+};
+
+vec3.str = vec3.toString;
+
+module.exports = Vector3;
+},{}],35:[function(require,module,exports){
+var common = require('./common');
+
+function Vector4(x, y, z, w) {
+	if (typeof x === "object") {
+        this.x = x.x||0;
+        this.y = x.y||0;
+        this.z = x.z||0;
+        this.w = x.w||0;
+    } else {
+        this.x = x||0;
+        this.y = y||0;
+        this.z = z||0;
+        this.w = w||0;
+    }
+}
+
+//shorthand it for better minification
+var vec4 = Vector4.prototype;
+
+//mixin common functions
+for (var k in common) {
+    vec4[k] = common[k];
+}
+
+vec4.clone = function() {
+    return new Vector4(this.x, this.y, this.z, this.w);
+};
+
+vec4.multiply = function(v) {
+    this.x *= v.x;
+    this.y *= v.y;
+    this.z *= v.z;
+    this.w *= v.w;
+    return this;
+};
+
+vec4.divide = function(v) {
+    this.x /= v.x;
+    this.y /= v.y;
+    this.z /= v.z;
+    this.w /= v.w;
+    return this;
+};
+
+vec4.distance = function(v) {
+    var dx = v.x - this.x,
+        dy = v.y - this.y,
+        dz = v.z - this.z,
+        dw = v.w - this.w;
+    return Math.sqrt(dx*dx + dy*dy + dz*dz + dw*dw);
+};
+
+vec4.distanceSq = function(v) {
+    var dx = v.x - this.x,
+        dy = v.y - this.y,
+        dz = v.z - this.z,
+        dw = v.w - this.w;
+    return dx*dx + dy*dy + dz*dz + dw*dw;
+};
+
+vec4.negate = function() {
+    this.x = -this.x;
+    this.y = -this.y;
+    this.z = -this.z;
+    this.w = -this.w;
+    return this;
+};
+
+vec4.transformMat4 = function(mat) {
+    var m = mat.val, x = this.x, y = this.y, z = this.z, w = this.w;
+    this.x = m[0] * x + m[4] * y + m[8] * z + m[12] * w;
+    this.y = m[1] * x + m[5] * y + m[9] * z + m[13] * w;
+    this.z = m[2] * x + m[6] * y + m[10] * z + m[14] * w;
+    this.w = m[3] * x + m[7] * y + m[11] * z + m[15] * w;
+    return this;
+};
+
+//// TODO: is this really the same as Vector3 ??
+///  Also, what about this:
+///  http://molecularmusings.wordpress.com/2013/05/24/a-faster-quaternion-vector-multiplication/
+vec4.transformQuat = function(q) {
+    // benchmarks: http://jsperf.com/quaternion-transform-vec3-implementations
+    var x = this.x, y = this.y, z = this.z,
+        qx = q.x, qy = q.y, qz = q.z, qw = q.w,
+
+        // calculate quat * vec
+        ix = qw * x + qy * z - qz * y,
+        iy = qw * y + qz * x - qx * z,
+        iz = qw * z + qx * y - qy * x,
+        iw = -qx * x - qy * y - qz * z;
+
+    // calculate result * inverse quat
+    this.x = ix * qw + iw * -qx + iy * -qz - iz * -qy;
+    this.y = iy * qw + iw * -qy + iz * -qx - ix * -qz;
+    this.z = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+    return this;
+};
+
+vec4.random = function(scale) {
+    scale = scale || 1.0;
+
+    //Not spherical; should fix this for more uniform distribution
+    this.x = (Math.random() * 2 - 1) * scale;
+    this.y = (Math.random() * 2 - 1) * scale;
+    this.z = (Math.random() * 2 - 1) * scale;
+    this.w = (Math.random() * 2 - 1) * scale;
+    return this;
+};
+
+vec4.reset = function() {
+    this.x = 0;
+    this.y = 0;
+    this.z = 0;
+    this.w = 0;
+    return this;
+};
+
+vec4.sub = vec4.subtract;
+
+vec4.mul = vec4.multiply;
+
+vec4.div = vec4.divide;
+
+vec4.dist = vec4.distance;
+
+vec4.distSq = vec4.distanceSq;
+
+vec4.len = vec4.length;
+
+vec4.lenSq = vec4.lengthSq;
+
+vec4.toString = function() {
+    return 'Vector4(' + this.x + ', ' + this.y + ', ' + this.z + ', ' + this.w + ')';
+};
+
+vec4.str = vec4.toString;
+
+module.exports = Vector4;
+},{"./common":36}],36:[function(require,module,exports){
+//common vec4 functions
+module.exports = {
+    
+/**
+ * Copies the x, y, z, w components from the specified
+ * Vector. Unlike most other operations, this function
+ * will default undefined components on `otherVec` to zero.
+ * 
+ * @method  copy
+ * @param  {otherVec} the other Vector4 to copy
+ * @return {Vector}  this, for chaining
+ */
+
+
+/**
+ * A convenience function to set the components of
+ * this vector as x, y, z, w. Falsy or undefined
+ * parameters will default to zero.
+ *
+ * You can also pass a vector object instead of
+ * individual components, to copy the object's components.
+ * 
+ * @method  set
+ * @param {Number} x the x component
+ * @param {Number} y the y component
+ * @param {Number} z the z component
+ * @param {Number} w the w component
+ * @return {Vector2}  this, for chaining
+ */
+
+/**
+ * Adds the components of the other Vector4 to
+ * this vector.
+ * 
+ * @method add
+ * @param  {Vector4} otherVec other vector, right operand
+ * @return {Vector2}  this, for chaining
+ */
+
+/**
+ * Subtracts the components of the other Vector4
+ * from this vector. Aliased as `sub()`
+ * 
+ * @method  subtract
+ * @param  {Vector4} otherVec other vector, right operand
+ * @return {Vector2}  this, for chaining
+ */
+
+/**
+ * Multiplies the components of this Vector4
+ * by a scalar amount.
+ *
+ * @method  scale
+ * @param {Number} s the scale to multiply by
+ * @return {Vector4} this, for chaining
+ */
+
+/**
+ * Returns the magnitude (length) of this vector.
+ *
+ * Aliased as `len()`
+ * 
+ * @method  length
+ * @return {Number} the length of this vector
+ */
+
+/**
+ * Returns the squared magnitude (length) of this vector.
+ *
+ * Aliased as `lenSq()`
+ * 
+ * @method  lengthSq
+ * @return {Number} the squared length of this vector
+ */
+
+/**
+ * Normalizes this vector to a unit vector.
+ * @method normalize
+ * @return {Vector4}  this, for chaining
+ */
+
+/**
+ * Returns the dot product of this vector
+ * and the specified Vector4.
+ * 
+ * @method dot
+ * @return {Number} the dot product
+ */
+    copy: function(otherVec) {
+        this.x = otherVec.x||0;
+        this.y = otherVec.y||0;
+        this.z = otherVec.z||0;
+        this.w = otherVec.w||0;
+        return this;
+    },
+
+    set: function(x, y, z, w) {
+        if (typeof x === "object") {
+            this.x = x.x||0;
+            this.y = x.y||0;
+            this.z = x.z||0;
+            this.w = x.w||0;
+        } else {
+            this.x = x||0;
+            this.y = y||0;
+            this.z = z||0;
+            this.w = w||0;
+
+        }
+        return this;
+    },
+
+    add: function(v) {
+        this.x += v.x;
+        this.y += v.y;
+        this.z += v.z;
+        this.w += v.w;
+        return this;
+    },
+
+    subtract: function(v) {
+        this.x -= v.x;
+        this.y -= v.y;
+        this.z -= v.z;
+        this.w -= v.w;
+        return this;
+    },
+
+    scale: function(s) {
+        this.x *= s;
+        this.y *= s;
+        this.z *= s;
+        this.w *= s;
+        return this;
+    },
+
+
+    length: function() {
+        var x = this.x,
+            y = this.y,
+            z = this.z,
+            w = this.w;
+        return Math.sqrt(x*x + y*y + z*z + w*w);
+    },
+
+    lengthSq: function() {
+        var x = this.x,
+            y = this.y,
+            z = this.z,
+            w = this.w;
+        return x*x + y*y + z*z + w*w;
+    },
+
+    normalize: function() {
+        var x = this.x,
+            y = this.y,
+            z = this.z,
+            w = this.w;
+        var len = x*x + y*y + z*z + w*w;
+        if (len > 0) {
+            len = 1 / Math.sqrt(len);
+            this.x = x*len;
+            this.y = y*len;
+            this.z = z*len;
+            this.w = w*len;
+        }
+        return this;
+    },
+
+    dot: function(v) {
+        return this.x * v.x + this.y * v.y + this.z * v.z + this.w * v.w;
+    },
+
+    lerp: function(v, t) {
+        var ax = this.x,
+            ay = this.y,
+            az = this.z,
+            aw = this.w;
+        t = t||0;
+        this.x = ax + t * (v.x - ax);
+        this.y = ay + t * (v.y - ay);
+        this.z = az + t * (v.z - az);
+        this.w = aw + t * (v.w - aw);
+        return this;
+    }
+};
 },{}],37:[function(require,module,exports){
-module.exports=require(13)
-},{}],38:[function(require,module,exports){
-module.exports=require(14)
-},{}],39:[function(require,module,exports){
-module.exports=require(15)
-},{"./Matrix3":37,"./Vector3":41,"./common":43}],40:[function(require,module,exports){
-module.exports=require(16)
-},{}],41:[function(require,module,exports){
-module.exports=require(17)
-},{}],42:[function(require,module,exports){
-module.exports=require(18)
-},{"./common":43}],43:[function(require,module,exports){
-module.exports=require(19)
-},{}],44:[function(require,module,exports){
-arguments[4][20][0].apply(exports,arguments)
-},{"./Matrix3":37,"./Matrix4":38,"./Quaternion":39,"./Vector2":40,"./Vector3":41,"./Vector4":42}]},{},[2])
+module.exports = {
+    Vector2: require('./Vector2'),
+    Vector3: require('./Vector3'),
+    Vector4: require('./Vector4'),
+    Matrix3: require('./Matrix3'),
+    Matrix4: require('./Matrix4'),
+    Quaternion: require('./Quaternion')
+};
+},{"./Matrix3":30,"./Matrix4":31,"./Quaternion":32,"./Vector2":33,"./Vector3":34,"./Vector4":35}]},{},[2]);

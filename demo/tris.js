@@ -19,7 +19,7 @@ var renderer = new TriangleRenderer();
 renderer.text = text;
 renderer.font = Font;
 renderer.fontSize = 100;
-renderer.align = 'left';
+renderer.align = 'right';
 renderer.layout(window.innerWidth-padding); 
 
 var textHeight = renderer.getBounds().height;
