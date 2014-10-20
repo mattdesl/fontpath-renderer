@@ -5,7 +5,7 @@ var tmpBounds = { x: 0, y: 0, width: 0, height: 0, glyphs: 0 };
 
 function TextRenderer(options) {
     if (!(this instanceof TextRenderer))
-        return new TextRenderer(options)
+        return new TextRenderer(options);
     options = options||{}
 
     this.iterator = new GlyphIterator(options.font, options.fontSize);
@@ -19,19 +19,23 @@ function TextRenderer(options) {
     this._text = "";
 
     if (typeof options.align === 'string')
-        this.align = options.align
+        this.align = options.align;
     if (typeof options.underline === 'boolean')
-        this.underline = options.underline
+        this.underline = options.underline;
     if (typeof options.underlineThickness === 'number')
-        this.underlineThickness = options.underlineThickness
+        this.underlineThickness = options.underlineThickness;
     if (typeof options.underlinePosition === 'number')
-        this.underlinePosition = options.underlinePosition
+        this.underlinePosition = options.underlinePosition;
     if (typeof options.text === 'string')
-        this.text = options.text
+        this.text = options.text;
+    if (typeof options.lineHeight === 'number')
+        this.lineHeight = options.lineHeight;
+    if (typeof options.letterSpacing === 'number')
+        this.letterSpacing = options.letterSpacing;
     if (typeof options.wrapMode === 'string')
-        this.wordwrap.mode = options.wrapMode
+        this.wordwrap.mode = options.wrapMode;
     if (typeof options.wrapWidth === 'number')
-        this.layout(options.wrapWidth)
+        this.layout(options.wrapWidth);
 }
 
 //Internally we will use integers to avoid string comparison for each glyph
@@ -41,73 +45,82 @@ var ALIGN_ARRAY = [
     'center', 
     'right'
 ];
-
-/**
- * If the new font differs from the last, the text layout is cleared
- * and placed onto a single line. Users must manually re-layout the text 
- * for word wrapping.
- */
-Object.defineProperty(TextRenderer.prototype, "font", {
-    get: function() {
-        return this.iterator.font;
-    },
-    set: function(val) {
-        var oldFont = this.iterator.font;
-        this.iterator.font = val;
-        if (oldFont !== this.iterator.font)
-            this.clearLayout();
-    },
-});
-
-/**
- * If the new font size differs from the last, the text layout is cleared
- * and placed onto a single line. Users must manually re-layout the text 
- * for word wrapping.
- */
-Object.defineProperty(TextRenderer.prototype, "fontSize", {
-    get: function() {
-        return this.iterator.fontSize;
-    },
-    set: function(val) {
-        var oldSize = this.iterator.fontSize;
-
-        this.iterator.fontSize = val;
-
-        if (oldSize !== this.iterator.fontSize)
-            this.clearLayout();
-    },
-});
-
-Object.defineProperty(TextRenderer.prototype, "lineHeight", {
-    get: function() {
-        return this.iterator.lineHeight;
-    },
-    set: function(val) {
-        this.iterator.lineHeight = val;
-    },
-});
-
-/**
- * If the new text is different from the last, the layout (i.e. word-wrapping)
- * is cleared and the result is a single line of text (similar to HTML5 canvas text
- * rendering).
- * 
- * The text then needs to be re-wordwrapped with a call to `layout()`.
- */
-Object.defineProperty(TextRenderer.prototype, "text", {
-    get: function() {
-        return this._text;
+    
+Object.defineProperties(TextRenderer.prototype, {
+    /**
+     * If the new font differs from the last, the text layout is cleared
+     * and placed onto a single line. Users must manually re-layout the text 
+     * for word wrapping.
+     */
+    "font": {
+        get: function() {
+            return this.iterator.font;
+        },
+        set: function(val) {
+            var oldFont = this.iterator.font;
+            this.iterator.font = val;
+            if (oldFont !== this.iterator.font)
+                this.clearLayout();
+        },
     },
 
-    set: function(text) {
-        text = text||"";
+    /**
+     * If the new font size differs from the last, the text layout is cleared
+     * and placed onto a single line. Users must manually re-layout the text 
+     * for word wrapping.
+     */
+    "fontSize": {
+        get: function() {
+            return this.iterator.fontSize;
+        },
+        set: function(val) {
+            var oldSize = this.iterator.fontSize;
 
-        var old = this._text;
-        this._text = text;
-        this.wordwrap.text = this.text;
+            this.iterator.fontSize = val;
 
-        if (this._text !== old) 
-            this.clearLayout();
+            if (oldSize !== this.iterator.fontSize)
+                this.clearLayout();
+        },
+    },
+    "lineHeight": {
+        get: function() {
+            return this.iterator.lineHeight;
+        },
+        set: function(val) {
+            this.iterator.lineHeight = val;
+        },
+    },
+    "letterSpacing": {
+         get: function() {
+            return this.iterator.letterSpacing;
+        },
+        set: function(val) {
+            this.iterator.letterSpacing = val;
+        },
+    },
+
+    /**
+     * If the new text is different from the last, the layout (i.e. word-wrapping)
+     * is cleared and the result is a single line of text (similar to HTML5 canvas text
+     * rendering).
+     * 
+     * The text then needs to be re-wordwrapped with a call to `layout()`.
+     */
+    "text": {
+        get: function() {
+            return this._text;
+        },
+
+        set: function(text) {
+            text = text||"";
+
+            var old = this._text;
+            this._text = text;
+            this.wordwrap.text = this.text;
+
+            if (this._text !== old) 
+                this.clearLayout();
+        }
     }
 });
 
