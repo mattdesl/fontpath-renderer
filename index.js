@@ -78,6 +78,15 @@ Object.defineProperty(TextRenderer.prototype, "fontSize", {
     },
 });
 
+Object.defineProperty(TextRenderer.prototype, "lineHeight", {
+    get: function() {
+        return this.iterator.lineHeight;
+    },
+    set: function(val) {
+        this.iterator.lineHeight = val;
+    },
+});
+
 /**
  * If the new text is different from the last, the layout (i.e. word-wrapping)
  * is cleared and the result is a single line of text (similar to HTML5 canvas text
