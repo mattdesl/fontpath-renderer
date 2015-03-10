@@ -42,6 +42,6 @@
   "dependencies": {
     "fontpath-glyph-iterator": "^1.1.0",
     "fontpath-util": "^2.0.0",
-    "fontpath-wordwrap": "0.0.0"
+    "fontpath-wordwrap": "^1.0.1"
   }
 }
